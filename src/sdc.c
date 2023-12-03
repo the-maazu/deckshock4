@@ -12,6 +12,7 @@ static int sdc_fd;
 
 int sdc_close()
 {
+    fputs("Closing SDC\n", stderr);
     return close(sdc_fd);
 }
 
@@ -37,6 +38,7 @@ int sdc_open()
         sdc_fd = open(*path, O_RDWR | __O_CLOEXEC);
         if (sdc_fd < 0){
             fputs("Could not locate file\n", stderr);
+            sd_device_enumerator_unref(sdc_enum);
             return EXIT_FAILURE;
         }
             
@@ -64,10 +66,72 @@ int sdc_open()
         device = sd_device_enumerator_get_device_next(sdc_enum);
     }
 
+    sd_device_enumerator_unref(sdc_enum);
     return EXIT_FAILURE;
 }
 
-int sdc_read_report(char* buf, size_t nbytes)
+int sdc_read_report(char* buf, size_t nbyts)
 {
-    return read(sdc_fd, buf, nbytes);
+    return read(sdc_fd, buf, nbyts);
+}
+
+static void handle_inhibit(int bool)
+{
+    const char *path[100];
+    int fd;
+    sd_device *device;
+    static sd_device_enumerator *enumtr;
+    struct input_id inputid;
+
+    sd_device_enumerator_new(&enumtr);
+    sd_device_enumerator_ref(enumtr);
+    sd_device_enumerator_add_match_subsystem(enumtr, "input", 1);
+
+    device = sd_device_enumerator_get_device_first(enumtr);
+    uint8_t i = 50;
+    while (i--)
+    {
+        sd_device_get_devname(device, path);
+        fd = open(*path, O_RDWR | __O_CLOEXEC);
+        if (fd < 0)
+        {
+            device = sd_device_enumerator_get_device_next(enumtr);
+            fprintf(stderr, "Could not locate file at %s\n", *path);
+            continue;
+        }
+            
+
+        ioctl(fd, EVIOCGID, &inputid);
+        if (
+            inputid.vendor == 0x28de 
+            || inputid.product == 0x1205 
+        ) 
+        {
+            if (bool)
+                fprintf(stderr, "inhibiting: %s\n", *path);
+            else
+                fprintf(stderr, "uninhibiting: %s\n", *path);
+            ioctl(fd, EVIOCGRAB, bool);
+        }
+        device = sd_device_enumerator_get_device_next(enumtr);
+    }
+    sd_device_enumerator_unref(enumtr);
+
+    // valve virtual jostick
+    if (bool)
+            fprintf(stderr, "inhibiting: /dev/input/js0\n");
+        else
+            fprintf(stderr, "uninhibiting: /dev/input/js0\n");
+    fd = open("/dev/input/js0", O_RDWR | __O_CLOEXEC);
+    ioctl(fd, EVIOCGRAB, bool);
+}
+
+int sdc_inhibit()
+{
+    handle_inhibit(1);
+}
+
+int sdc_uninhibit()
+{
+    handle_inhibit(0);
 }

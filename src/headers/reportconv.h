@@ -1,1 +1,0 @@
-int report_conv_sdc_to_ds4(const char *sdc_report, const char *ds4_report);
