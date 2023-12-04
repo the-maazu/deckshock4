@@ -8,7 +8,7 @@
 #include <poll.h>
 
 // descriptor
-static const char ds4_rdesc[] = {
+static const char ds4rdesc[] = {
     0x05, 0x01,                    // Usage Page (Generic Desktop)        0
     0x09, 0x05,                    // Usage (Game Pad)                    2
     0xa1, 0x01,                    // Collection (Application)            4
@@ -259,17 +259,17 @@ static const char ds4_rdesc[] = {
 
 // reports below acquired from https://psdevwiki.com/ps4/DS4-USB
 #define REPID_MAC 0x81
-// static const char ds4_mac_rep[] = {0x81,0x8B,0x09,0x07,0x6D,0x66,0x1C};
-static const char ds4_mac_rep[] = {0x81,0x56,0x78,0x90,0x5f,0x1b,0x40};
+// static const char ds4macrep[] = {0x81,0x8B,0x09,0x07,0x6D,0x66,0x1C};
+static const char ds4macrep[] = {0x81,0x56,0x78,0x90,0x5f,0x1b,0x40};
 
 #define REPID_MAC2 0x12
-// static const char ds4_mac_rep2[] = {
+// static const char ds4macrep2[] = {
 //     0x12,0x8B,0x09,0x07,
 //     0x6D,0x66,0x1C,0x08,
 //     0x25,0x00,0xAC,0x9E,
 //     0x17,0x94,0x05,0xB0,
 // };
-static const char ds4_mac_rep2[] = {
+static const char ds4macrep2[] = {
     0x12,0x56,0x78,0x90,0x5f,0x1b,0x40,
     0x08,0x25,0x00,0x82,0xa1,0x71,0x65,
     0x5a,0x50
@@ -277,7 +277,7 @@ static const char ds4_mac_rep2[] = {
 
 
 #define REPID_CALIB 0x02
-// static const char ds4_calib_rep[] = {
+// static const char ds4calibrep[] = {
 //     0x02,0x01,0x00,0x00,0x00,0x00,
 //     0x00,0x87,0x22,0x7B,0xDD,0xB2,
 //     0x22,0x47,0xDD,0xBD,0x22,0x43,
@@ -286,7 +286,7 @@ static const char ds4_mac_rep2[] = {
 //     0xE0,0x3A,0x1D,0xC6,0xDE,0x08,
 //     0x00
 // };
-static const char ds4_calib_rep[] = {
+static const char ds4calibrep[] = {
     0x02,0xff,0xff,0x09,0x00,0xfe,
     0xff,0xa2,0x22,0x56,0xdd,0xa4,
     0x22,0x73,0xdd,0xd0,0x23,0x26,
@@ -297,7 +297,7 @@ static const char ds4_calib_rep[] = {
 };
 
 #define REPID_VERS 0xA3
-// static const char ds4_ver_rep[] = {
+// static const char ds4verrep[] = {
 //     0xA3, 0x41,0x75,0x67,0x20,0x20,0x33,0x20,0x32,
 //     0x30,0x31,0x33,0x00,0x00,0x00,0x00,0x00,0x30,
 //     0x37,0x3A,0x30,0x31,0x3A,0x31,0x32,0x00,0x00,
@@ -305,7 +305,7 @@ static const char ds4_calib_rep[] = {
 //     0x31,0x03,0x00,0x00,0x00,0x49,0x00,0x05,0x00,
 //     0x00,0x80,0x03,0x00,
 // };
-static const char ds4_ver_rep[] = {
+static const char ds4verrep[] = {
     0xa3,0x53,0x65,0x70,0x20,0x20,0x34,
     0x20,0x32,0x30,0x31,0x35,0x00,0x00,
     0x00,0x00,0x00,0x30,0x33,0x3a,0x35,
@@ -315,14 +315,14 @@ static const char ds4_ver_rep[] = {
     0x20,0x03,0x01,0x00,0x80,0x03,0x00
 };
 
-static int ds4_fd;
-static struct pollfd ds4_pfd;
+static int ds4fd;
+static struct pollfd ds4pfd;
 
 static int uhid_write( const struct uhid_event *ev)
 {
 	ssize_t ret;
 
-	ret = write(ds4_fd, ev, sizeof(*ev));
+	ret = write(ds4fd, ev, sizeof(*ev));
 	if (ret < 0) {
 		fprintf(stderr, "Cannot write to uhid: %m\n");
 		return -errno;
@@ -342,8 +342,8 @@ int ds4_create()
 	int ret;
 
 	fprintf(stderr, "Open uhid-cdev %s\n", path);
-	ds4_fd = open(path, O_RDWR | __O_CLOEXEC);
-	if (ds4_fd < 0) {
+	ds4fd = open(path, O_RDWR | __O_CLOEXEC);
+	if (ds4fd < 0) {
 		fprintf(stderr, "Cannot open uhid-cdev %s: %m\n", path);
 		return EXIT_FAILURE;
 	}
@@ -352,15 +352,15 @@ int ds4_create()
 	memset(&ev, 0, sizeof(ev));
 	ev.type = UHID_CREATE2;
 	strcpy((char*)ev.u.create2.name, "Wireless Controller");
-	memcpy(ev.u.create2.rd_data, ds4_rdesc, sizeof(ds4_rdesc));
-	ev.u.create2.rd_size = sizeof(ds4_rdesc);
+	memcpy(ev.u.create2.rd_data, ds4rdesc, sizeof(ds4rdesc));
+	ev.u.create2.rd_size = sizeof(ds4rdesc);
 	ev.u.create2.bus = BUS_USB;
 	ev.u.create2.vendor = 0x054c;
 	ev.u.create2.product = 0x05c4;
 	ev.u.create2.version = 0x0100;
 	ev.u.create2.country = 0;
-    ds4_pfd.fd = ds4_fd;
-    ds4_pfd.events = POLLIN;
+    ds4pfd.fd = ds4fd;
+    ds4pfd.events = POLLIN;
 
 	return uhid_write(&ev);
 }
@@ -395,23 +395,23 @@ static void handle_get_report(const struct uhid_event *ev)
     switch(ev->u.get_report.rnum)
     {
         case REPID_MAC:
-            nev.u.get_report_reply.size = sizeof(ds4_mac_rep);
-            memcpy(nev.u.get_report_reply.data, ds4_mac_rep, sizeof(ds4_mac_rep));
+            nev.u.get_report_reply.size = sizeof(ds4macrep);
+            memcpy(nev.u.get_report_reply.data, ds4macrep, sizeof(ds4macrep));
 	        uhid_write(&nev);  
             break;
         case REPID_MAC2:
-            nev.u.get_report_reply.size = sizeof(ds4_mac_rep2);
-            memcpy(nev.u.get_report_reply.data, ds4_mac_rep2, sizeof(ds4_mac_rep2));
+            nev.u.get_report_reply.size = sizeof(ds4macrep2);
+            memcpy(nev.u.get_report_reply.data, ds4macrep2, sizeof(ds4macrep2));
 	        uhid_write(&nev);  
             break;
         case REPID_CALIB:
-            nev.u.get_report_reply.size = sizeof(ds4_calib_rep);
-            memcpy(nev.u.get_report_reply.data, ds4_calib_rep, sizeof(ds4_calib_rep));
+            nev.u.get_report_reply.size = sizeof(ds4calibrep);
+            memcpy(nev.u.get_report_reply.data, ds4calibrep, sizeof(ds4calibrep));
 	        uhid_write(&nev);
             break;
         case REPID_VERS:
-            nev.u.get_report_reply.size = sizeof(ds4_ver_rep);
-            memcpy(nev.u.get_report_reply.data, ds4_ver_rep, sizeof(ds4_ver_rep));
+            nev.u.get_report_reply.size = sizeof(ds4verrep);
+            memcpy(nev.u.get_report_reply.data, ds4verrep, sizeof(ds4verrep));
 	        uhid_write(&nev);
             break;
     }
@@ -420,15 +420,15 @@ static void handle_get_report(const struct uhid_event *ev)
 
 int ds4_recieve_req()
 {
-    poll(&ds4_pfd, 1, 0);
-    if(!(ds4_pfd.revents & POLLIN)) 
+    poll(&ds4pfd, 1, 0);
+    if(!(ds4pfd.revents & POLLIN)) 
         return 0;
 
 	struct uhid_event ev;
 	ssize_t ret;
 
 	memset(&ev, 0, sizeof(ev));
-	ret = read(ds4_fd, &ev, sizeof(ev));
+	ret = read(ds4fd, &ev, sizeof(ev));
 	if (ret == 0) {
 		fprintf(stderr, "Read HUP on uhid-cdev\n");
 		return -EFAULT;

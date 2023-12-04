@@ -8,12 +8,12 @@
 #include <string.h>
 #include <stdlib.h>
 
-static int sdc_fd;
+static int sdcfd;
 
 int sdc_close()
 {
     fputs("Closing SDC\n", stderr);
-    return close(sdc_fd);
+    return close(sdcfd);
 }
 
 int sdc_open()
@@ -22,29 +22,29 @@ int sdc_open()
     // vendor defined usage.
     static char desc_tip[3] = "\x06\xFF\xFF";
     sd_device *device;
-    static sd_device_enumerator *sdc_enum;
+    static sd_device_enumerator *sdcenum;
     struct hidraw_devinfo devinfo;
     struct hidraw_report_descriptor desc;
 
-    sd_device_enumerator_new(&sdc_enum);
-    sd_device_enumerator_ref(sdc_enum);
-    sd_device_enumerator_add_match_subsystem(sdc_enum, "hidraw", 1);
+    sd_device_enumerator_new(&sdcenum);
+    sd_device_enumerator_ref(sdcenum);
+    sd_device_enumerator_add_match_subsystem(sdcenum, "hidraw", 1);
 
-    device = sd_device_enumerator_get_device_first(sdc_enum);
+    device = sd_device_enumerator_get_device_first(sdcenum);
     uint8_t i = 30; // go through a max of 30 devices
     while (i--)
     {
         sd_device_get_devname(device, path);
-        sdc_fd = open(*path, O_RDWR | __O_CLOEXEC);
-        if (sdc_fd < 0){
+        sdcfd = open(*path, O_RDWR | __O_CLOEXEC);
+        if (sdcfd < 0){
             fputs("Could not locate file\n", stderr);
-            sd_device_enumerator_unref(sdc_enum);
+            sd_device_enumerator_unref(sdcenum);
             return EXIT_FAILURE;
         }
             
-        ioctl(sdc_fd, HIDIOCGRAWINFO, &devinfo);
-        ioctl(sdc_fd, HIDIOCGRDESCSIZE, &(desc.size));
-        ioctl(sdc_fd, HIDIOCGRDESC, &desc);
+        ioctl(sdcfd, HIDIOCGRAWINFO, &devinfo);
+        ioctl(sdcfd, HIDIOCGRDESCSIZE, &(desc.size));
+        ioctl(sdcfd, HIDIOCGRDESC, &desc);
 
         fprintf(stderr, "path: %s\n", *path);
         fprintf(stderr, "Bustype(3 for USB):%i VID:%x PID:%x First3bytes:0x",
@@ -59,20 +59,20 @@ int sdc_open()
             && devinfo.product == 0x1205 
             && !memcmp(desc_tip, desc.value, sizeof(desc_tip))
         ) {
-            sd_device_enumerator_unref(sdc_enum);
+            sd_device_enumerator_unref(sdcenum);
             return EXIT_SUCCESS;
         }
 
-        device = sd_device_enumerator_get_device_next(sdc_enum);
+        device = sd_device_enumerator_get_device_next(sdcenum);
     }
 
-    sd_device_enumerator_unref(sdc_enum);
+    sd_device_enumerator_unref(sdcenum);
     return EXIT_FAILURE;
 }
 
 int sdc_read_report(char* buf, size_t nbyts)
 {
-    return read(sdc_fd, buf, nbyts);
+    return read(sdcfd, buf, nbyts);
 }
 
 static void handle_inhibit(int bool)

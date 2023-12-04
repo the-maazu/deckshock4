@@ -31,7 +31,7 @@ void quit()
 
 int main(int argc, char **argv)
 {
-    char sdc_rep[REP_SIZE], ds4_rep[REP_SIZE];
+    char sdcrep[REP_SIZE], ds4rep[REP_SIZE];
     signal(SIGINT, quit);
 
     fputs("Starting\n", stderr);
@@ -52,8 +52,8 @@ int main(int argc, char **argv)
     while(1) 
     {
         ds4_recieve_req();
-        sdc_read_report(sdc_rep, sizeof(sdc_rep));
-        report_sdc_to_ds4(ds4_rep, sdc_rep);
-        ds4_send_report(ds4_rep, REP_SIZE);
+        sdc_read_report(sdcrep, sizeof(sdcrep));
+        report_sdc_to_ds4(ds4rep, sdcrep);
+        ds4_send_report(ds4rep, REP_SIZE);
     }
 }
