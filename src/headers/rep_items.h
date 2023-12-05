@@ -164,23 +164,23 @@ static const scalitm ds4rtpadY = {
 static const scalitm ds4gyroX = {
     .bytofst = 13,
     .nbyts = 2,
-    .s = 0,
-    .min = 0,
-    .max = UINT16_MAX,
+    .s = 1,
+    .min = INT16_MIN,
+    .max = INT16_MAX,
 };
 static const scalitm ds4gyroY = {
     .bytofst = 15,
     .nbyts = 2,
-    .s = 0,
-    .min = 0,
-    .max = UINT16_MAX,
+    .s = 1,
+    .min = INT16_MIN,
+    .max = INT16_MAX,
 };
 static const scalitm ds4gyroZ = {
     .bytofst = 17,
     .nbyts = 2,
-    .s = 0,
-    .min = 0,
-    .max = UINT16_MAX,
+    .s = 1,
+    .min = INT16_MIN,
+    .max = INT16_MAX,
 };
 static const scalitm ds4accelX = {
     .bytofst = 19,
@@ -203,7 +203,7 @@ static const scalitm ds4accelZ = {
     .min = INT16_MIN,
     .max = INT16_MAX,
 };
-/* Start: DS4 report items */
+/* End: DS4 report items */
 
 /* Start: SDC report items */
 //  dpad
@@ -348,43 +348,43 @@ static const scalitm sdcrtpadY = {
     .nbyts = 1,
 };
 // sensors
-static const scalitm sdcgyroX = {
-    .bytofst = 31,
+static const scalitm sdcgyroP = {
+    .bytofst = 30,
     .nbyts = 2,
-    .s = 0,
-    .min = 0,
-    .max = UINT16_MAX,
+    .s = 1,
+    .min = INT16_MIN,
+    .max = INT16_MAX,
 };
 static const scalitm sdcgyroY = {
-    .bytofst = 33,
+    .bytofst = 32,
     .nbyts = 2,
-    .s = 0,
-    .min = 0,
-    .max = UINT16_MAX,
+    .s = 1,
+    .min = INT16_MIN,
+    .max = INT16_MAX,
 };
-static const scalitm sdcgyroZ = {
-    .bytofst = 35,
+static const scalitm sdcgyroR = {
+    .bytofst = 34,
     .nbyts = 2,
-    .s = 0,
-    .min = 0,
-    .max = UINT16_MAX,
+    .s = 1,
+    .min = INT16_MIN,
+    .max = INT16_MAX,
 };
 static const scalitm sdcaccelX = {
-    .bytofst = 25,
+    .bytofst = 24,
     .nbyts = 2,
     .s = 1,
     .min = INT16_MIN,
     .max = INT16_MAX,
 };
 static const scalitm sdcaccelY = {
-    .bytofst = 27,
+    .bytofst = 26,
     .nbyts = 2,
     .s = 1,
     .min = INT16_MIN,
     .max = INT16_MAX,
 };
 static const scalitm sdcaccelZ = {
-    .bytofst = 29,
+    .bytofst = 28,
     .nbyts = 2,
     .s = 1,
     .min = INT16_MIN,

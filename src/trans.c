@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "headers/report.h"
-#include "headers/report_items.h"
+#include "headers/trans.h"
+#include "headers/rep_items.h"
 #include <stdlib.h>
 #include <time.h>
 
@@ -48,7 +48,7 @@ static void trans_bools(char *ds4rep, const char *sdcrep)
         {&sdcB, &ds4O},
         {&sdcX, &ds4Sq},
         {&sdcY, &ds4Tri},
-        // // shoulder
+        // shoulder
         {&sdcL1, &ds4L1},
         {&sdcR1, &ds4R1},
         {&sdcL2bool, &ds4L2bool},
@@ -146,9 +146,11 @@ static void trans_scalars(char *ds4rep, const char *sdcrep)
         trans_scalar(ds4rep, sdcrep, map[i][1], map[i][0], invmap[i]);
 }
 
+// increment below acquired from https://psdevwiki.com/ps4/DS4-USB
 #define DS4_TIMSTMP_INC 188;
-int report_sdc_to_ds4(char *ds4rep, const char *sdcrep)
+int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
 {
+    // keep last two bits for PS and tpad click
     uint8_t counter = ((uint8_t) ds4rep[ds4counter.bytofst]  + (1 << 2))  & 0xFC;
     uint16_t tymstmp = *(uint16_t*)&ds4rep[ds4tymstmp.bytofst] + DS4_TIMSTMP_INC;
 

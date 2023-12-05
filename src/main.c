@@ -5,7 +5,7 @@
 #include "headers/sdc.h"
 #include "headers/ds4.h"
 #include <time.h>
-#include "headers/report.h"
+#include "headers/trans.h"
 #include <poll.h>
 #include <unistd.h>
 #include <signal.h>
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     {
         ds4_recieve_req();
         sdc_read_report(sdcrep, sizeof(sdcrep));
-        report_sdc_to_ds4(ds4rep, sdcrep);
+        trans_rep_sdc_to_ds4(ds4rep, sdcrep);
         ds4_send_report(ds4rep, REP_SIZE);
     }
 }
