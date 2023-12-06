@@ -352,13 +352,14 @@ int ds4_create()
 	fprintf(stderr, "Create DS4 device\n");
 	memset(&ev, 0, sizeof(ev));
 	ev.type = UHID_CREATE2;
-	strcpy((char*)ev.u.create2.name, "Wireless Controller");
-	memcpy(ev.u.create2.rd_data, ds4rdesc, sizeof(ds4rdesc));
+	strcpy((char *) ev.u.create2.name, "Sony Computer Entertainment Wireless Controller");
+	strcpy((char *) ev.u.create2.phys, "usb-xhci-hcd.2.auto-1.4/input0");
+    memcpy(ev.u.create2.rd_data, ds4rdesc, sizeof(ds4rdesc));
 	ev.u.create2.rd_size = sizeof(ds4rdesc);
 	ev.u.create2.bus = BUS_USB;
 	ev.u.create2.vendor = 0x054c;
 	ev.u.create2.product = 0x05c4;
-	ev.u.create2.version = 0x0100;
+	ev.u.create2.version = 0x8111;
 	ev.u.create2.country = 0;
     ds4pfd.fd = ds4fd;
     ds4pfd.events = POLLIN;
