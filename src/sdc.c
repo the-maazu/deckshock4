@@ -75,7 +75,7 @@ int sdc_read_report(char* buf, size_t nbyts)
     return read(sdcfd, buf, nbyts);
 }
 
-static void handle_inhibit(int bool)
+static void _inhibit(int bool)
 {
     const char *path[100];
     int fd;
@@ -128,10 +128,10 @@ static void handle_inhibit(int bool)
 
 int sdc_inhibit()
 {
-    handle_inhibit(1);
+    _inhibit(1);
 }
 
 int sdc_uninhibit()
 {
-    handle_inhibit(0);
+    _inhibit(0);
 }

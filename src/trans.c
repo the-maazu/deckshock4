@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-static void trans_dpad(char *ds4rep, const char *sdcrep)
+static void set_dpad(char *ds4rep, const char *sdcrep)
 {
     uint8_t left = sdcrep[sdcdpadL.bytofst] & (1 << sdcdpadL.bitofst);
     uint8_t right = sdcrep[sdcdpadR.bytofst] & (1 << sdcdpadR.bitofst);
@@ -39,7 +39,7 @@ static void trans_dpad(char *ds4rep, const char *sdcrep)
         ds4rep[ds4dpad.bytofst] |= DS4_DPAD_O;
 }
 
-static void trans_bools(char *ds4rep, const char *sdcrep)
+static void set_bools(char *ds4rep, const char *sdcrep)
 {
     #define BOOL_CNT 15
     static const boolitm *map[BOOL_CNT][2] = {
@@ -78,7 +78,7 @@ static void trans_bools(char *ds4rep, const char *sdcrep)
 
 }
 
-static void trans_scalar(
+static void set_scalar(
     char *ds4rep, 
     const char *sdcrep, 
     const scalitm * ds4itm, 
@@ -119,7 +119,7 @@ static void trans_scalar(
     else if ( nbyts == 4) *(uint32_t *) &ds4rep[offset] = s ? (int32_t) norm : (uint32_t) norm;
 }
 
-static void trans_scalars(char *ds4rep, const char *sdcrep)
+static void set_scalars(char *ds4rep, const char *sdcrep)
 {
      #define SCALAR_CNT 12
     static const scalitm *map[SCALAR_CNT][2] = {
@@ -143,14 +143,115 @@ static void trans_scalars(char *ds4rep, const char *sdcrep)
     static const uint8_t invmap[SCALAR_CNT] = {0,1,0,1,0,0,0,0,0,0,0,1};
 
     for (int i = 0; i < SCALAR_CNT; i++)
-        trans_scalar(ds4rep, sdcrep, map[i][1], map[i][0], invmap[i]);
+        set_scalar(ds4rep, sdcrep, map[i][1], map[i][0], invmap[i]);
+}
+
+
+typedef enum tpadside {lefttpad, righttpad} tpadside;
+static void set_tpad_f1 (
+    char * ds4rep, 
+    const char * sdcrep,
+    const tpadside tpadside,
+    const boolitm * tchsrc,
+    const scalitm * scalX,
+    const scalitm * scalY
+){
+    
+    static uint8_t prevtch = 1;
+    static uint8_t prevcnt = 0;
+    static uint8_t prevcord[3];
+    uint8_t touch = (sdcrep[tchsrc->bytofst] >> tchsrc->bitofst) & 1;
+    uint16_t X, Y;
+
+    if (touch)
+    {
+        X = tpadside == lefttpad ?
+            (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
+            : (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
+        Y = 800 - (double) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
+
+        ds4rep[ds4tpadf1touch.bytofst] &= ~(1 << ds4tpadf1touch.bitofst);
+        ds4rep[ds4tpadf1touch.bytofst + 1] |= X;
+        ds4rep[ds4tpadf1touch.bytofst + 2] |= X >> 8;
+        ds4rep[ds4tpadf1touch.bytofst + 2] |= Y << 4 ;
+        ds4rep[ds4tpadf1touch.bytofst + 3] |= Y >> 4;
+        *(uint32_t *) prevcord = *(uint32_t *)&ds4rep[ds4tpadf1touch.bytofst + 1];
+    } else
+    {
+        if(prevtch)  // leave MSB for touch detection
+            ds4rep[ds4tpadf1touch.bytofst] |= ++prevcnt & 0x7F;
+        *(uint32_t *)&ds4rep[ds4tpadf1touch.bytofst + 1] |= *(uint32_t *) prevcord;
+    }
+    prevtch = touch;
+}
+
+static void set_tpad_f2(
+    char * ds4rep, 
+    const char * sdcrep, 
+    const tpadside tpadside,
+    const boolitm * tchsrc,
+    const scalitm * scalX,
+    const scalitm * scalY
+){
+     static uint8_t prevtch = 1;
+    static uint8_t prevcnt = 0;
+    static uint8_t prevcord[3];
+    uint8_t touch = (sdcrep[tchsrc->bytofst] >> tchsrc->bitofst) & 1;
+    uint16_t X, Y;
+
+    if (touch)
+    {
+        X = tpadside == lefttpad ?
+            (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
+            : (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
+        Y = 800 - (double) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
+
+        ds4rep[ds4tpadf2touch.bytofst] &= ~(1 << ds4tpadf2touch.bitofst);
+        ds4rep[ds4tpadf2touch.bytofst + 1] |= X;
+        ds4rep[ds4tpadf2touch.bytofst + 2] |= X >> 8;
+        ds4rep[ds4tpadf2touch.bytofst + 2] |= Y << 4 ;
+        ds4rep[ds4tpadf2touch.bytofst + 3] |= Y >> 4;
+        *(uint32_t *) prevcord = *(uint32_t *)&ds4rep[ds4tpadf2touch.bytofst + 1];
+    } else
+    {
+        if(prevtch)  // leave MSB for touch detection
+            ds4rep[ds4tpadf2touch.bytofst] |= ++prevcnt & 0x7F;
+        *(uint32_t *)&ds4rep[ds4tpadf2touch.bytofst + 1] |= *(uint32_t *) prevcord;
+    }
+    prevtch = touch;
+}
+
+typedef enum touch_mode {leftfrst, righfrst} touch_mode;
+static void set_tpad(char *ds4rep, const char *sdcrep)
+{
+    static uint8_t prevtouch;
+    static touch_mode mode = righfrst;
+    uint8_t curtouch = (sdcrep[sdcrtpadtouch.bytofst] >> sdcrtpadtouch.bitofst) & 1;
+    curtouch |= (sdcrep[sdcltpadtouch.bytofst] >> (sdcltpadtouch.bitofst - 1)) & 2;
+
+    if( prevtouch == 0 && curtouch == 1)
+        mode = righfrst;
+    if ( prevtouch == 0 && curtouch == 2)
+        mode = leftfrst;
+    prevtouch = curtouch;
+
+    if (mode == leftfrst )
+    {
+        set_tpad_f1(ds4rep, sdcrep, lefttpad, &sdcltpadtouch ,&sdcltpadX, &sdcltpadY);
+        set_tpad_f2(ds4rep, sdcrep, righttpad, &sdcrtpadtouch ,&sdcrtpadX, &sdcrtpadY);
+    }
+    else
+    {
+        set_tpad_f1(ds4rep, sdcrep, righttpad, &sdcrtpadtouch ,&sdcrtpadX, &sdcrtpadY);
+        set_tpad_f2(ds4rep, sdcrep, lefttpad, &sdcltpadtouch ,&sdcltpadX, &sdcltpadY);
+    }
 }
 
 // increment below acquired from https://psdevwiki.com/ps4/DS4-USB
 #define DS4_TIMSTMP_INC 188;
 int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
 {
-    // keep last two bits for PS and tpad click
+    // leave last two bits for PS and tpad click
     uint8_t counter = ((uint8_t) ds4rep[ds4counter.bytofst]  + (1 << 2))  & 0xFC;
     uint16_t tymstmp = *(uint16_t*)&ds4rep[ds4tymstmp.bytofst] + DS4_TIMSTMP_INC;
 
@@ -160,8 +261,11 @@ int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
     ds4rep[ds4batlvl.bytofst] = UINT8_MAX; // battery
     ds4rep[ds4counter.bytofst] |= counter;
     *(uint16_t *) &ds4rep[ds4tymstmp.bytofst]  = tymstmp;
+    ds4rep[30] = 0x1B; // no headphones/ nothing attached
+    ds4rep[33] = 0x01; // 2 tpad touch mode
      
-    trans_dpad(ds4rep, sdcrep);
-    trans_bools(ds4rep, sdcrep);
-    trans_scalars(ds4rep, sdcrep);
+    set_dpad(ds4rep, sdcrep);
+    set_bools(ds4rep, sdcrep);
+    set_scalars(ds4rep, sdcrep);
+    set_tpad(ds4rep, sdcrep);
 }

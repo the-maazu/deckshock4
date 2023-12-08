@@ -144,21 +144,13 @@ static const boolitm ds4tpadclick = {
     .bytofst = 7,
     .bitofst = 1,
 };
-static const scalitm ds4ltpadX = {
-    .bytofst = 34,
-    .nbyts = 2,
+static const boolitm ds4tpadf1touch = {
+    .bytofst = 35,
+    .bitofst = 1,
 };
-static const scalitm ds4ltpadY = {
-    .bytofst = 36,
-    .nbyts = 2,
-};
-static const scalitm ds4rtpadX = {
-    .bytofst = 38,
-    .nbyts = 2,
-};
-static const scalitm ds4rtpadY = {
-    .bytofst = 40,
-    .nbyts = 2,
+static const boolitm ds4tpadf2touch = {
+    .bytofst = 39,
+    .bitofst = 1,
 };
 // sensors
 static const scalitm ds4gyroX = {
@@ -331,20 +323,28 @@ static const boolitm sdcrtpadclick = {
     .bytofst = 10,
     .bitofst = 2,
 };
+static const boolitm sdcltpadtouch = {
+    .bytofst = 10,
+    .bitofst = 3,
+};
+static const boolitm sdcrtpadtouch = {
+    .bytofst = 10,
+    .bitofst = 4,
+};
 static const scalitm sdcltpadX = {
-    .bytofst = 17,
-    .nbyts = 1,
+    .bytofst = 16,
+    .nbyts = 2,
 };
 static const scalitm sdcltpadY = {
-    .bytofst = 19,
+    .bytofst = 18,
     .nbyts = 1,
 };
 static const scalitm sdcrtpadX = {
-    .bytofst = 21,
+    .bytofst = 20,
     .nbyts = 1,
 };
 static const scalitm sdcrtpadY = {
-    .bytofst = 23,
+    .bytofst = 22,
     .nbyts = 1,
 };
 // sensors
