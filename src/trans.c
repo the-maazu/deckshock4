@@ -1,10 +1,14 @@
+#define _POSIX_C_SOURCE 199309L
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include "headers/trans.h"
-#include "headers/rep_items.h"
+#include "headers/ds4_items.h"
+#include "headers/sdc_items.h"
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 static void set_dpad(char *ds4rep, const char *sdcrep)
 {
@@ -157,9 +161,9 @@ static void set_tpad_f1 (
     const scalitm * scalY
 ){
     
-    static uint8_t prevtch = 1;
-    static uint8_t prevcnt = 0;
-    static uint8_t prevcord[3];
+    static uint8_t prevtch;
+    static uint8_t count;
+    static uint8_t cord[3];
     uint8_t touch = (sdcrep[tchsrc->bytofst] >> tchsrc->bitofst) & 1;
     uint16_t X, Y;
 
@@ -170,17 +174,17 @@ static void set_tpad_f1 (
             : (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
         Y = 800 - (double) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
 
-        ds4rep[ds4tpadf1touch.bytofst] &= ~(1 << ds4tpadf1touch.bitofst);
+        ds4rep[ds4tpadf1touch.bytofst] = (count & 0x7F);
         ds4rep[ds4tpadf1touch.bytofst + 1] |= X;
         ds4rep[ds4tpadf1touch.bytofst + 2] |= X >> 8;
         ds4rep[ds4tpadf1touch.bytofst + 2] |= Y << 4 ;
         ds4rep[ds4tpadf1touch.bytofst + 3] |= Y >> 4;
-        *(uint32_t *) prevcord = *(uint32_t *)&ds4rep[ds4tpadf1touch.bytofst + 1];
+        memcpy( cord, &ds4rep[ds4tpadf1touch.bytofst + 1], 3);
     } else
     {
-        if(prevtch)  // leave MSB for touch detection
-            ds4rep[ds4tpadf1touch.bytofst] |= ++prevcnt & 0x7F;
-        *(uint32_t *)&ds4rep[ds4tpadf1touch.bytofst + 1] |= *(uint32_t *) prevcord;
+        ds4rep[ds4tpadf1touch.bytofst] = 0x80;
+        ds4rep[ds4tpadf1touch.bytofst] |= (prevtch ? ++count : count) & 0x7F;
+        memcpy( &ds4rep[ds4tpadf1touch.bytofst + 1],  cord, 3);
     }
     prevtch = touch;
 }
@@ -193,9 +197,9 @@ static void set_tpad_f2(
     const scalitm * scalX,
     const scalitm * scalY
 ){
-     static uint8_t prevtch = 1;
-    static uint8_t prevcnt = 0;
-    static uint8_t prevcord[3];
+    static uint8_t prevtch;
+    static uint8_t count;
+    static uint8_t cord[3];
     uint8_t touch = (sdcrep[tchsrc->bytofst] >> tchsrc->bitofst) & 1;
     uint16_t X, Y;
 
@@ -206,26 +210,26 @@ static void set_tpad_f2(
             : (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
         Y = 800 - (double) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
 
-        ds4rep[ds4tpadf2touch.bytofst] &= ~(1 << ds4tpadf2touch.bitofst);
+        ds4rep[ds4tpadf2touch.bytofst] = (count & 0x7F);
         ds4rep[ds4tpadf2touch.bytofst + 1] |= X;
         ds4rep[ds4tpadf2touch.bytofst + 2] |= X >> 8;
         ds4rep[ds4tpadf2touch.bytofst + 2] |= Y << 4 ;
         ds4rep[ds4tpadf2touch.bytofst + 3] |= Y >> 4;
-        *(uint32_t *) prevcord = *(uint32_t *)&ds4rep[ds4tpadf2touch.bytofst + 1];
+        memcpy( cord, &ds4rep[ds4tpadf2touch.bytofst + 1], 3);
     } else
     {
-        if(prevtch)  // leave MSB for touch detection
-            ds4rep[ds4tpadf2touch.bytofst] |= ++prevcnt & 0x7F;
-        *(uint32_t *)&ds4rep[ds4tpadf2touch.bytofst + 1] |= *(uint32_t *) prevcord;
+        ds4rep[ds4tpadf2touch.bytofst] = 0x80;
+        ds4rep[ds4tpadf2touch.bytofst] |= (prevtch ? ++count : count) & 0x7F;
+        memcpy( &ds4rep[ds4tpadf2touch.bytofst + 1],  cord, 3);
     }
     prevtch = touch;
 }
 
 typedef enum touch_mode {leftfrst, righfrst} touch_mode;
-static void set_tpad(char *ds4rep, const char *sdcrep)
+static void set_tpad(char *ds4rep, const char *sdcrep, uint8_t tpadtime, uint8_t timeinc)
 {
     static uint8_t prevtouch;
-    static touch_mode mode = righfrst;
+    static touch_mode mode;
     uint8_t curtouch = (sdcrep[sdcrtpadtouch.bytofst] >> sdcrtpadtouch.bitofst) & 1;
     curtouch |= (sdcrep[sdcltpadtouch.bytofst] >> (sdcltpadtouch.bitofst - 1)) & 2;
 
@@ -245,27 +249,35 @@ static void set_tpad(char *ds4rep, const char *sdcrep)
         set_tpad_f1(ds4rep, sdcrep, righttpad, &sdcrtpadtouch ,&sdcrtpadX, &sdcrtpadY);
         set_tpad_f2(ds4rep, sdcrep, lefttpad, &sdcltpadtouch ,&sdcltpadX, &sdcltpadY);
     }
+
+    ds4rep[ds4tpadtime.bytofst] = tpadtime + (curtouch ? timeinc : 0);
 }
 
-// increment below acquired from https://psdevwiki.com/ps4/DS4-USB
-#define DS4_TIMSTMP_INC 188;
 int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
 {
+    // elapsed time since prev report
+    // 1.25ms => 188 acquired from https://psdevwiki.com/ps4/DS4-USB
+    static struct timespec prevtp;
+    struct timespec curtp;
+    clock_gettime(CLOCK_REALTIME, &curtp);
+    uint8_t timeinc = ( curtp.tv_nsec - prevtp.tv_nsec ) * 0.0001504; // (1/1.25ms * 188) in nanoseconds
+
     // leave last two bits for PS and tpad click
     uint8_t counter = ((uint8_t) ds4rep[ds4counter.bytofst]  + (1 << 2))  & 0xFC;
-    uint16_t tymstmp = *(uint16_t*)&ds4rep[ds4tymstmp.bytofst] + DS4_TIMSTMP_INC;
+    uint16_t timestmp = *(uint16_t*)&ds4rep[ds4tymstmp.bytofst] + timeinc;
+    uint8_t tpadtime = ds4rep[ds4tpadtime.bytofst];
 
     memset(ds4rep, 0, REP_SIZE);
 
     ds4rep[0] = 0x01; // report id
     ds4rep[ds4batlvl.bytofst] = UINT8_MAX; // battery
-    ds4rep[ds4counter.bytofst] |= counter;
-    *(uint16_t *) &ds4rep[ds4tymstmp.bytofst]  = tymstmp;
+    ds4rep[ds4counter.bytofst] = counter;
+    *(uint16_t *) &ds4rep[ds4tymstmp.bytofst]  = timestmp;
     ds4rep[30] = 0x1B; // no headphones/ nothing attached
-    ds4rep[33] = 0x01; // 2 tpad touch mode
+    ds4rep[33] = 0x01; // 2 finger tpad touch mode
      
     set_dpad(ds4rep, sdcrep);
     set_bools(ds4rep, sdcrep);
     set_scalars(ds4rep, sdcrep);
-    set_tpad(ds4rep, sdcrep);
+    set_tpad(ds4rep, sdcrep, tpadtime, timeinc);
 }

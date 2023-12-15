@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "headers/sdc_items.h"
 
 static int sdcfd;
 
@@ -118,12 +119,12 @@ static void _inhibit(int bool)
     sd_device_enumerator_unref(enumtr);
 
     // valve virtual jostick
-    if (bool)
-            fprintf(stderr, "inhibiting: /dev/input/js0\n");
-        else
-            fprintf(stderr, "uninhibiting: /dev/input/js0\n");
-    fd = open("/dev/input/js0", O_RDWR | __O_CLOEXEC);
-    ioctl(fd, EVIOCGRAB, bool);
+    // if (bool)
+    //         fprintf(stderr, "inhibiting: /dev/input/js0\n");
+    //     else
+    //         fprintf(stderr, "uninhibiting: /dev/input/js0\n");
+    // fd = open("/dev/input/js0", O_RDWR | __O_CLOEXEC);
+    // ioctl(fd, EVIOCGRAB, bool);
 }
 
 int sdc_inhibit()
@@ -134,4 +135,9 @@ int sdc_inhibit()
 int sdc_uninhibit()
 {
     _inhibit(0);
+}
+
+uint8_t sdc_steam_down(const char* buf)
+{
+    return (buf[sdcSTEAM.bytofst] >> sdcSTEAM.bitofst) & 1;
 }
