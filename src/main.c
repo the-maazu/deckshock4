@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 #include "headers/sdc.h"
 #include "headers/ds4.h"
 #include "headers/trans.h"
@@ -19,6 +20,37 @@ void quit()
     sdc_close();
     sdc_uninhibit();
     exit(EXIT_SUCCESS);
+}
+
+void *ds4_input_routine()
+{
+    while (1)
+    {
+        ds4_recieve_req();
+    }
+    
+}
+
+void *steam_btn_routine(void * sdcrep)
+{
+    struct timespec prevtp;
+    struct timespec curtp;
+    clock_gettime(CLOCK_REALTIME, &prevtp);
+    curtp = prevtp;
+
+    while(1) 
+    {
+        if(curtp.tv_sec - prevtp.tv_sec > 5)
+            quit(); // quit if steam button held for 5 secs
+
+        if(sdc_steam_down(sdcrep)) // update current time
+            clock_gettime(CLOCK_REALTIME, &curtp);
+        else 
+        { // reset time delta
+            clock_gettime(CLOCK_REALTIME, &prevtp);
+            curtp = prevtp;
+        }
+    }
 }
 
 int main(int argc, char **argv)
@@ -39,27 +71,16 @@ int main(int argc, char **argv)
         quit();
     }
     fputs("Created DS4 successfully\n", stderr);
+
+    pthread_t steam_btn_thread, ds4_input_thread;
+    pthread_create(&steam_btn_thread, NULL, steam_btn_routine, sdcrep);
+    pthread_create(&ds4_input_thread, NULL, ds4_input_routine, NULL);
+    
     sdc_inhibit();
-
-    struct timespec prevtp = {};
-    struct timespec curtp = {};
-
     while(1) 
-    {
-        if(curtp.tv_sec - prevtp.tv_sec > 5)
-            quit(); // quit if steam button held for 5 secs
-        
-        ds4_recieve_req();
+    {   
         sdc_read_report(sdcrep, sizeof(sdcrep));
         trans_rep_sdc_to_ds4(ds4rep, sdcrep);
         ds4_send_report(ds4rep, REP_SIZE);
-
-        if(sdc_steam_down(sdcrep)) // update current time
-            clock_gettime(CLOCK_REALTIME, &curtp);
-        else 
-        { // reset time delta
-            clock_gettime(CLOCK_REALTIME, &prevtp);
-            memcpy(&curtp, &prevtp, sizeof(prevtp));
-        }
     }
 }

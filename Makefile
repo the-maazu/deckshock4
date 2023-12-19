@@ -14,7 +14,7 @@ $(objects) : $$(patsubst build%.o,src%.c, $$@) | $(objdir)
 	gcc  -c $^ -o $@
 
 $(objdir)/deckshock4 : $(objects)
-	gcc  $^ -o $@ -lsystemd
+	gcc  $^ -o $@ -lsystemd -lpthread
 
 .PHONY: push
 push: $(objdir)/deckshock4
