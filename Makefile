@@ -18,7 +18,7 @@ $(objdir)/deckshock4 : $(objects)
 
 .PHONY: push
 push: $(objdir)/deckshock4
-	scp -i ${SSH_KEY} ${JUMP_HOST} $^ ${USER}@${HOST}:/home/${USER}/.local/bin
+	scp -O -i ${SSH_KEY} ${JUMP_HOST} $^ ${USER}@${HOST}:/home/${USER}/.local/bin
 
 .PHONY: clean
 clean:

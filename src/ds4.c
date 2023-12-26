@@ -260,7 +260,6 @@ static const char ds4rdesc[] = {
 // reports below acquired from https://psdevwiki.com/ps4/DS4-USB
 #define REPID_MAC 0x81
 static const char ds4macrep[] = {0x81,0x8B,0x09,0x07,0x6D,0x66,0x1C};
-// static const char ds4macrep[] = {0x81,0x56,0x78,0x90,0x5f,0x1b,0x40};
 
 #define REPID_MAC2 0x12
 static const char ds4macrep2[] = {
@@ -269,13 +268,6 @@ static const char ds4macrep2[] = {
     0x25,0x00,0xAC,0x9E,
     0x17,0x94,0x05,0xB0,
 };
-// static const char ds4macrep2[] = {
-//     0x12,0x56,0x78,0x90,
-//     0x5f,0x1b,0x40,0x08,
-//     0x25,0x00,0x82,0xa1,
-//     0x71,0x65,0x5a,0x50
-// };
-
 
 #define REPID_CALIB 0x02
 static const char ds4calibrep[] = {
@@ -287,15 +279,6 @@ static const char ds4calibrep[] = {
     0xE0,0x3A,0x1D,0xC6,0xDE,0x08,
     0x00
 };
-// static const char ds4calibrep[] = {
-//     0x02,0xff,0xff,0x09,0x00,0xfe,
-//     0xff,0xa2,0x22,0x56,0xdd,0xa4,
-//     0x22,0x73,0xdd,0xd0,0x23,0x26,
-//     0xdc,0x1c,0x02,0x1c,0x02,0xd4,
-//     0x20,0x2c,0xdf,0x42,0x20,0xbe,
-//     0xdf,0x36,0x1f,0xcb,0xe0,0x04,
-//     0x00
-// };
 
 #define REPID_VERS 0xA3
 static const char ds4verrep[] = {
@@ -306,26 +289,17 @@ static const char ds4verrep[] = {
     0x31,0x03,0x00,0x00,0x00,0x49,0x00,0x05,0x00,
     0x00,0x80,0x03,0x00,
 };
-// static const char ds4verrep[] = {
-//     0xa3,0x53,0x65,0x70,0x20,0x20,0x34,
-//     0x20,0x32,0x30,0x31,0x35,0x00,0x00,
-//     0x00,0x00,0x00,0x30,0x33,0x3a,0x35,
-//     0x36,0x3a,0x30,0x30,0x00,0x00,0x00,
-//     0x00,0x00,0x00,0x00,0x00,0x00,0x01,
-//     0x04,0x54,0x01,0x00,0x00,0x00,0x35,
-//     0x20,0x03,0x01,0x00,0x80,0x03,0x00
-// };
 
-static int ds4fd;
-static struct pollfd ds4pfd;
+static int uhidfd;
+static struct pollfd uhidpfd;
 
 static int uhid_write( const struct uhid_event *ev)
 {
 	ssize_t ret;
 
-	ret = write(ds4fd, ev, sizeof(*ev));
+	ret = write(uhidfd, ev, sizeof(*ev));
 	if (ret < 0) {
-		fprintf(stderr, "Cannot write to uhid: %m\n");
+		// fprintf(stderr, "Cannot write to uhid: %m\n");
 		return -errno;
 	} else if (ret != sizeof(*ev)) {
 		fprintf(stderr, "Wrong size written to uhid: %zd != %zu\n",
@@ -343,8 +317,8 @@ int ds4_create()
 	int ret;
 
 	fprintf(stderr, "Open uhid-cdev %s\n", path);
-	ds4fd = open(path, O_RDWR | __O_CLOEXEC);
-	if (ds4fd < 0) {
+	uhidfd = open(path, O_RDWR | __O_CLOEXEC);
+	if (uhidfd < 0) {
 		fprintf(stderr, "Cannot open uhid-cdev %s: %m\n", path);
 		return EXIT_FAILURE;
 	}
@@ -353,16 +327,18 @@ int ds4_create()
 	memset(&ev, 0, sizeof(ev));
 	ev.type = UHID_CREATE2;
 	strcpy((char *) ev.u.create2.name, "Sony Computer Entertainment Wireless Controller");
-	strcpy((char *) ev.u.create2.phys, "usb-xhci-hcd.2.auto-1.4/input0");
+    strcpy(ev.u.create2.uniq, "1C:66:6D:07:09:8B:81");
+    // strcpy((char *) ev.u.create2.phys, "usb-xhci-hcd.2.auto-1.4/input0");
+	// strcpy((char *) ev.u.create2.phys, "usb-0000:04:00.3-1.1/input0");
     memcpy(ev.u.create2.rd_data, ds4rdesc, sizeof(ds4rdesc));
 	ev.u.create2.rd_size = sizeof(ds4rdesc);
 	ev.u.create2.bus = BUS_USB;
 	ev.u.create2.vendor = 0x054c;
 	ev.u.create2.product = 0x05c4;
-	ev.u.create2.version = 0x8111;
+	ev.u.create2.version = 0x0100;
 	ev.u.create2.country = 0;
-    ds4pfd.fd = ds4fd;
-    ds4pfd.events = POLLIN;
+    uhidpfd.fd = uhidfd;
+    uhidpfd.events = POLLIN;
 
 	return uhid_write(&ev);
 }
@@ -420,17 +396,28 @@ static void handle_get_report(const struct uhid_event *ev)
     
 }
 
+static void handle_set_report(const struct uhid_event *ev)
+{
+    struct uhid_event nev;
+    nev.type = UHID_SET_REPORT_REPLY;
+    nev.u.get_report_reply.id = ev->u.get_report.id;
+    nev.u.get_report_reply.err = 0;
+
+    fprintf(stderr, "Set report: %02x\n", ev->u.get_report.rnum);
+    uhid_write(&nev);
+}
+
 int ds4_recieve_req()
 {
-    poll(&ds4pfd, 1, 0);
-    if(!(ds4pfd.revents & POLLIN)) 
+    poll(&uhidpfd, 1, 0);
+    if(!(uhidpfd.revents & POLLIN)) 
         return 0;
 
 	struct uhid_event ev;
 	ssize_t ret;
 
 	memset(&ev, 0, sizeof(ev));
-	ret = read(ds4fd, &ev, sizeof(ev));
+	ret = read(uhidfd, &ev, sizeof(ev));
 	if (ret == 0) {
 		fprintf(stderr, "Read HUP on uhid-cdev\n");
 		return -EFAULT;
@@ -444,7 +431,7 @@ int ds4_recieve_req()
 	}
 	switch (ev.type) {
         case UHID_GET_REPORT:
-            // fprintf(stderr, "UHID_GET_REPORT from uhid-dev\n");
+            fprintf(stderr, "UHID_GET_REPORT from uhid-dev\n");
             handle_get_report(&ev);
             break;
 	    case UHID_START:
@@ -465,8 +452,12 @@ int ds4_recieve_req()
 	    case UHID_OUTPUT_EV:
 	    	// fprintf(stderr, "UHID_OUTPUT_EV from uhid-dev\n");
 	    	break;
-	    // default:
-		// fprintf(stderr, "Invalid event from uhid-dev: %u\n", ev.type);
+        case UHID_SET_REPORT:
+            fprintf(stderr, "UHID_SET_REPORT from uhid-dev\n");
+            handle_set_report(&ev);
+	    	break;
+	    default:
+		fprintf(stderr, "Invalid event from uhid-dev: %u\n", ev.type);
 	}
 
 	return 0;

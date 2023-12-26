@@ -18,11 +18,10 @@ void quit()
     fputs("\nQuitting\n", stderr);
     ds4_destroy();
     sdc_close();
-    sdc_uninhibit();
     exit(EXIT_SUCCESS);
 }
 
-void *ds4_input_routine()
+void *ds4_req_routine()
 {
     while (1)
     {
@@ -40,7 +39,7 @@ void *steam_btn_routine(void * sdcrep)
 
     while(1) 
     {
-        if(curtp.tv_sec - prevtp.tv_sec > 5)
+        if(curtp.tv_sec - prevtp.tv_sec > 10)
             quit(); // quit if steam button held for 5 secs
 
         if(sdc_steam_down(sdcrep)) // update current time
@@ -57,6 +56,9 @@ int main(int argc, char **argv)
 {
     char sdcrep[REP_SIZE], ds4rep[REP_SIZE];
     signal(SIGINT, quit);
+    signal(SIGKILL, quit);
+    signal(SIGTERM, quit);
+    signal(SIGQUIT, quit);
 
     fputs("Starting\n", stderr);
     if (sdc_open() == EXIT_FAILURE)
@@ -74,11 +76,10 @@ int main(int argc, char **argv)
 
     pthread_t steam_btn_thread, ds4_input_thread;
     pthread_create(&steam_btn_thread, NULL, steam_btn_routine, sdcrep);
-    pthread_create(&ds4_input_thread, NULL, ds4_input_routine, NULL);
+    pthread_create(&ds4_input_thread, NULL, ds4_req_routine, NULL);
     
-    sdc_inhibit();
     while(1) 
-    {   
+    {
         sdc_read_report(sdcrep, sizeof(sdcrep));
         trans_rep_sdc_to_ds4(ds4rep, sdcrep);
         ds4_send_report(ds4rep, REP_SIZE);

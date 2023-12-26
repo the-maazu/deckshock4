@@ -136,15 +136,15 @@ static void set_scalars(char *ds4rep, const char *sdcrep)
         {&sdcL2, &ds4L2},
         {&sdcR2, &ds4R2},
         //  accelerometer
-        {&sdcaccelX, &ds4accelX},
-        {&sdcaccelY, &ds4accelY},
+        {&sdcaccelX, &ds4accelY},
+        {&sdcaccelY, &ds4accelX},
         {&sdcaccelZ, &ds4accelZ},
         // gyro
         {&sdcgyroP, &ds4gyroX},
         {&sdcgyroR, &ds4gyroY},
         {&sdcgyroY, &ds4gyroZ},
     };
-    static const uint8_t invmap[SCALAR_CNT] = {0,1,0,1,0,0,0,0,0,0,0,1};
+    static const uint8_t invmap[SCALAR_CNT] = {0,1,0,1,0,0,1,0,0,0,0,1};
 
     for (int i = 0; i < SCALAR_CNT; i++)
         set_scalar(ds4rep, sdcrep, map[i][1], map[i][0], invmap[i]);
@@ -260,7 +260,7 @@ int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
     static struct timespec prevtp;
     struct timespec curtp;
     clock_gettime(CLOCK_REALTIME, &curtp);
-    uint8_t timeinc = ( curtp.tv_nsec - prevtp.tv_nsec ) * 0.0001504; // (1/1.25ms * 188) in nanoseconds
+    uint16_t timeinc = ( curtp.tv_nsec - prevtp.tv_nsec ) * 0.0001504; // (1/1.25ms * 188) in nanoseconds
 
     // leave last two bits for PS and tpad click
     uint8_t counter = ((uint8_t) ds4rep[ds4counter.bytofst]  + (1 << 2))  & 0xFC;
@@ -280,4 +280,6 @@ int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
     set_bools(ds4rep, sdcrep);
     set_scalars(ds4rep, sdcrep);
     set_tpad(ds4rep, sdcrep, tpadtime, timeinc);
+
+    prevtp = curtp;
 }
