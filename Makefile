@@ -23,3 +23,8 @@ push: $(objdir)/deckshock4
 .PHONY: clean
 clean:
 	rm -r $(objdir)/
+
+.PHONY: dist
+dist : deckshock4.tar.gz
+deckshock4.tar.gz : $(objdir)/deckshock4 scripts/uninstall.sh scripts/install.sh etc
+	tar -cz etc -Cbuild deckshock4 -C"../scripts" install.sh uninstall.sh > deckshock4.tar.gz
