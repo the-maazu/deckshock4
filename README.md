@@ -1,5 +1,5 @@
 # deckshock4
-DualShock® 4 emulator(translator really) for Steam Deck®
+DualShock® 4 emulator for Steam Deck®
 
 ## In(unin)stallation & Execution
 1. Download the latest [release ](https://github.com/the-maazu/deckshock4/releases) **deckshock4-vX.X.X.tar.gz**.
