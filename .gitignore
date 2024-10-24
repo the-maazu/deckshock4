@@ -1,4 +1,7 @@
 build
+out
+dist
 build-proton
 .env
 .vscode
+deckshock4*.tar.gz
