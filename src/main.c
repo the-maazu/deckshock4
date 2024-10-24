@@ -3,12 +3,10 @@
 #include <linux/uhid.h>
 #include <unistd.h>
 #include <signal.h>
-#include <poll.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <pthread.h>
 #include "headers/sdc.h"
 #include "headers/ds4.h"
 #include "headers/trans.h"
@@ -19,37 +17,6 @@ void quit()
     ds4_destroy();
     sdc_close();
     exit(EXIT_SUCCESS);
-}
-
-void *ds4_req_routine()
-{
-    while (1)
-    {
-        ds4_recieve_req();
-    }
-    
-}
-
-void *steam_btn_routine(void * sdcrep)
-{
-    struct timespec prevtp;
-    struct timespec curtp;
-    clock_gettime(CLOCK_REALTIME, &prevtp);
-    curtp = prevtp;
-
-    while(1) 
-    {
-        if(curtp.tv_sec - prevtp.tv_sec > 10)
-            quit(); // quit if steam button held for 5 secs
-
-        if(sdc_steam_down(sdcrep)) // update current time
-            clock_gettime(CLOCK_REALTIME, &curtp);
-        else 
-        { // reset time delta
-            clock_gettime(CLOCK_REALTIME, &prevtp);
-            curtp = prevtp;
-        }
-    }
 }
 
 int main(int argc, char **argv)
@@ -73,15 +40,37 @@ int main(int argc, char **argv)
         quit();
     }
     fputs("Created DS4 successfully\n", stderr);
-
-    pthread_t steam_btn_thread, ds4_input_thread;
-    pthread_create(&steam_btn_thread, NULL, steam_btn_routine, sdcrep);
-    pthread_create(&ds4_input_thread, NULL, ds4_req_routine, NULL);
     
+    // should help smoothen sensors
+    const struct timespec throttle = {
+        .tv_sec = 0,
+        .tv_nsec = 1250000, // 1.25ms
+    };
+
+    struct timespec prevtp;
+    struct timespec curtp;
+    clock_gettime(CLOCK_REALTIME, &prevtp);
+    curtp = prevtp;
+
     while(1) 
-    {
+    {   
+        ds4_recieve_req();
         sdc_read_report(sdcrep, sizeof(sdcrep));
+
+        if(curtp.tv_sec - prevtp.tv_sec > 10)
+            quit(); // quit if steam button held for 10 secs
+
+        if(sdc_steam_down(sdcrep)) // update current time
+            clock_gettime(CLOCK_REALTIME, &curtp);
+        else 
+        { // reset time delta
+            clock_gettime(CLOCK_REALTIME, &prevtp);
+            curtp = prevtp;
+        }
+
         trans_rep_sdc_to_ds4(ds4rep, sdcrep);
         ds4_send_report(ds4rep, REP_SIZE);
+
+        nanosleep(&throttle, NULL);
     }
 }
