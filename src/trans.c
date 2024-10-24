@@ -1,16 +1,13 @@
-#define _POSIX_C_SOURCE 199309L
-
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
 #include "headers/trans.h"
 #include "headers/ds4_items.h"
 #include "headers/sdc_items.h"
-#include <stdlib.h>
-#include <time.h>
-#include <string.h>
 
-static void set_dpad(char *ds4rep, const char *sdcrep)
+inline static void set_dpad(char *ds4rep, const char *sdcrep)
 {
     uint8_t left = sdcrep[sdcdpadL.bytofst] & (1 << sdcdpadL.bitofst);
     uint8_t right = sdcrep[sdcdpadR.bytofst] & (1 << sdcdpadR.bitofst);
@@ -43,7 +40,7 @@ static void set_dpad(char *ds4rep, const char *sdcrep)
         ds4rep[ds4dpad.bytofst] |= DS4_DPAD_O;
 }
 
-static void set_bools(char *ds4rep, const char *sdcrep)
+inline static void set_bools(char *ds4rep, const char *sdcrep)
 {
     #define BOOL_CNT 15
     static const boolitm *map[BOOL_CNT][2] = {
@@ -82,32 +79,33 @@ static void set_bools(char *ds4rep, const char *sdcrep)
 
 }
 
-static void set_scalar(
+inline static void set_scalar(
     char *ds4rep, 
     const char *sdcrep, 
     const scalitm * ds4itm, 
     const scalitm * sdcitm,
     const uint8_t invert
 ){
+
     size_t nbyts = sdcitm->nbyts;
     uint8_t s = sdcitm->s;
     uint8_t offset = sdcitm->bytofst;
     int32_t max = sdcitm->max;
     int32_t min = sdcitm->min;
 
-    double norm;
+    float norm;
     if( nbyts == 1)
         norm = s ? 
-        (double)(*(int8_t*) &sdcrep[offset])
-        : (double)(*(uint8_t*) &sdcrep[offset]);
+        (float)(*(int8_t*) &sdcrep[offset])
+        : (float)(*(uint8_t*) &sdcrep[offset]);
     else if ( nbyts == 2)
         norm = s ? 
-        (double)(*(int16_t*) &sdcrep[offset])
-        : (double)(*(uint16_t*) &sdcrep[offset]);
+        (float)(*(int16_t*) &sdcrep[offset])
+        : (float)(*(uint16_t*) &sdcrep[offset]);
     else if ( nbyts == 4)
         norm = s ? 
-        (double)(*(int32_t*) &sdcrep[offset])
-        : (double)(*(uint32_t*) &sdcrep[offset]);
+        (float)(*(int32_t*) &sdcrep[offset])
+        : (float)(*(uint32_t*) &sdcrep[offset]);
     norm = (norm - min)/(max - min); // normalise from 0 to 1;
 
     nbyts = ds4itm->nbyts;
@@ -123,7 +121,7 @@ static void set_scalar(
     else if ( nbyts == 4) *(uint32_t *) &ds4rep[offset] = s ? (int32_t) norm : (uint32_t) norm;
 }
 
-static void set_scalars(char *ds4rep, const char *sdcrep)
+inline static void set_scalars(char *ds4rep, const char *sdcrep)
 {
      #define SCALAR_CNT 12
     static const scalitm *map[SCALAR_CNT][2] = {
@@ -170,9 +168,9 @@ static void set_tpad_f1 (
     if (touch)
     {
         X = tpadside == lefttpad ?
-            (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
-            : (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
-        Y = 800 - (double) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
+            (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
+            : (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
+        Y = 800 - (float) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
 
         ds4rep[ds4tpadf1touch.bytofst] = (count & 0x7F);
         ds4rep[ds4tpadf1touch.bytofst + 1] |= X;
@@ -189,7 +187,7 @@ static void set_tpad_f1 (
     prevtch = touch;
 }
 
-static void set_tpad_f2(
+inline static void set_tpad_f2(
     char * ds4rep, 
     const char * sdcrep, 
     const tpadside tpadside,
@@ -206,9 +204,9 @@ static void set_tpad_f2(
     if (touch)
     {
         X = tpadside == lefttpad ?
-            (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
-            : (double) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
-        Y = 800 - (double) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
+            (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
+            : (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
+        Y = 800 - (float) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
 
         ds4rep[ds4tpadf2touch.bytofst] = (count & 0x7F);
         ds4rep[ds4tpadf2touch.bytofst + 1] |= X;
@@ -226,7 +224,7 @@ static void set_tpad_f2(
 }
 
 typedef enum touch_mode {leftfrst, righfrst} touch_mode;
-static void set_tpad(char *ds4rep, const char *sdcrep, uint8_t tpadtime, uint8_t timeinc)
+inline static void set_tpad(char *ds4rep, const char *sdcrep, uint8_t tpadtime, uint8_t timeinc)
 {
     static uint8_t prevtouch;
     static touch_mode mode;
@@ -283,3 +281,4 @@ int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
 
     prevtp = curtp;
 }
+
