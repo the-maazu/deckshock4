@@ -21,10 +21,11 @@ Input is duplicated while **deckshock4** is running;
 - In desktop mode, disable steam input for the emulated 'PS4 Controller' in Desktop Layout settings.
 - For games and apps with native DS4 support like PS Plus®, God of War© etc;
    1. Remove all Steam controller mappings for inbuilt controller leaving only Gyro set 'As Joystick'.
-   2. Disable steam input for the virtual 'PS4 Controller'.
-   3. Download and extract [Proto-X.X-X-ds4-X](https://github.com/the-maazu/Proton/releases) to <code>~/.steam/root/compatibilitytools.d/</code>. These are patched versions of proton to help detect virtual DS4 as a real controller. Some non-Sony games with DS4 support may not need this.
-   4. Restart Steam client
-   5. Force compatibility in game properties and select **Proton-X.X-X-ds4-X**.
+   2. Optional: Enable Trackpads 'As Joystick' for haptic feedback. 
+   3. Disable steam input for the virtual 'PS4 Controller'.
+   4. Download and extract [Proto-X.X-X-ds4-X](https://github.com/the-maazu/Proton/releases) to <code>~/.steam/root/compatibilitytools.d/</code>. These are patched versions of proton to help detect virtual DS4 as a real controller. Some non-Sony games with DS4 support may not need this.
+   5. Restart Steam client
+   6. Force compatibility in game properties and select **Proton-X.X-X-ds4-X**.
    
 **Note For PS Plus:**
 - Desktop mode is recommended as the app sometimes minimizes into system tray, which is not accessible in game mode. Seems to happen at start and if the network is bad.
