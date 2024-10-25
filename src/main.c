@@ -40,6 +40,8 @@ int main(int argc, char **argv)
         quit();
     }
     fputs("Created DS4 successfully\n", stderr);
+
+    trans_init();
     
     // should help smoothen sensors
     const struct timespec throttle = {
@@ -54,6 +56,7 @@ int main(int argc, char **argv)
 
     while(1) 
     {   
+        nanosleep(&throttle, NULL);
         ds4_recieve_req();
         sdc_read_report(sdcrep, sizeof(sdcrep));
 
@@ -70,7 +73,5 @@ int main(int argc, char **argv)
 
         trans_rep_sdc_to_ds4(ds4rep, sdcrep);
         ds4_send_report(ds4rep, REP_SIZE);
-
-        nanosleep(&throttle, NULL);
     }
 }
