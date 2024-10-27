@@ -1,0 +1,3 @@
+[submodule "nanojsonc"]
+	path = libmodules/nanojsonc
+	url = https://github.com/open-source-patterns/nanojsonc
