@@ -32,7 +32,7 @@ int sdc_open()
     sd_device_enumerator_add_match_subsystem(sdcenum, "hidraw", 1);
 
     device = sd_device_enumerator_get_device_first(sdcenum);
-    while (device = sd_device_enumerator_get_device_next(sdcenum))
+    while ((device = sd_device_enumerator_get_device_next(sdcenum)))
     {
         sd_device_get_devname(device, path);
         sdcfd = open(*path, O_RDWR | __O_CLOEXEC);

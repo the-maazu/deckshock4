@@ -1,16 +1,23 @@
+#include <fcntl.h>
+#include <stdint.h>
 #include <string.h>
+#include <sys/inotify.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include "parser.h"
+#include <assert.h>
+#include <stdbool.h>
+#include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
 
 #include "headers/trans.h"
 #include "headers/ds4_items.h"
 #include "headers/sdc_items.h"
-
-#define CONFIG_DIR "~/.local/share/deckshock4"
-#define CONFIG_FILE "map.json"
 
 #define BOOL_CNT 15
 #define SCALAR_CNT 6
@@ -50,8 +57,8 @@ static const scalitm* default_scalar_map[SCALAR_CNT][2] = {
 };
 static const scalitm* default_sensor_map[SENSOR_CNT][2] = {
      //  accelerometer
-    {&sdcaccelX, &ds4accelY},
-    {&sdcaccelY, &ds4accelX},
+    {&sdcaccelX, &ds4accelX},
+    {&sdcaccelY, &ds4accelY},
     {&sdcaccelZ, &ds4accelZ},
     // gyro
     {&sdcgyroP, &ds4gyroX},
@@ -270,7 +277,7 @@ inline static void set_tpad(char *ds4rep, const char *sdcrep, uint8_t tpadtime, 
     ds4rep[ds4tpadtime.bytofst] = tpadtime + (curtouch ? timeinc : 0);
 }
 
-int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
+void trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
 {
     // elapsed time since prev report
     // 1.25ms => 188 acquired from https://psdevwiki.com/ps4/DS4-USB
@@ -302,18 +309,184 @@ int trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
     prevtp = curtp;
 }
 
+#define CONFIG_FILE "config.json"
+#define CONFIG_RELHOME_PATH "/.local/share/deckshock4/"
+static char * configpath = NULL;
+static int configfd;
+static int inotifd;
+static int inotiwatchfd;
+
+static int mkdir_r(const char *dir) {
+    char tmp[256];
+    char *p = NULL;
+    size_t len;
+
+    snprintf(tmp, sizeof(tmp),"%s",dir);
+    len = strlen(tmp);
+    if (tmp[len - 1] == '/')
+        tmp[len - 1] = 0;
+    for (p = tmp + 1; *p; p++)
+        if (*p == '/') {
+            *p = 0;
+            mkdir(tmp, S_IRWXU);
+            *p = '/';
+        }
+    mkdir(tmp, S_IRWXU);
+    return EXIT_SUCCESS;
+}
+
+enum AccelEnum{ accelX, accelY, acceslZ};
+struct Config {
+    uint8_t disable;
+    enum AccelEnum accelX;
+    enum AccelEnum accelY;
+    enum AccelEnum accelZ;
+};
+
+static void update_maps(
+    enum NanoJSONCError error, 
+    const char *const key, 
+    const char *const value, 
+    const char *const parentKey, 
+    void *object
+) {
+    if (error != NO_ERROR) 
+    { 
+        fprintf(stderr, "%s\n", nanojsonc_error_desc(error)); 
+        return;
+    }
+
+    struct Config **config = object;
+
+    if (*config == NULL) {
+        *config = malloc(sizeof(struct Config));
+        **config = (struct Config){0}; // Initialize all members to 0
+    }
+}
+
+static int read_config_json() {
+    FILE *file = fdopen(configfd, "rb");
+    if (file == NULL) {
+        fprintf(stderr, "Error: %d: %s\n", errno, strerror(errno));
+        return errno;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        perror("Error seeking file");
+        fclose(file);
+        return errno;
+    }
+    long len = ftell(file);
+    rewind(file);
+
+    char *buffer = (char *) malloc(len + 1);
+    if (buffer == NULL) {
+        fclose(file);
+        perror("Error allocating memory");
+        return ENOMEM;
+    }
+
+    size_t bytes_read = fread(buffer, 1, len, file);
+    if (bytes_read != (size_t) len) {
+        if (feof(file)) {
+            perror("Error: end of file reached before reading expected bytes.");
+            fclose(file);
+            free(buffer);
+            return EIO;
+        } else if (ferror(file)) {
+            perror("Error reading the file");
+            fclose(file);
+            free(buffer);
+            return errno;
+        }
+    }
+    buffer[len] = '\0';
+    fclose(file);
+
+    struct Config *config = NULL;
+    nanojsonc_parse_object(
+        buffer, "config", 
+        &config, update_maps
+    );
+
+    free(buffer);
+    return 0;
+}
 
 void trans_init()
 {  
     struct stat st = {0};
-
-    if (stat(CONFIG_DIR, &st) == -1) {
-        mkdir(CONFIG_DIR, 0700);
+    char * username = NULL;
+    char * configdir = NULL;
+    
+    username = getlogin();
+    if(username == NULL) 
+    {
+        fputs("Could not retrieve username\n", stderr);
+        goto use_default_map;
     }
 
+    size_t dir_len = strlen("/home/") 
+        + strlen(CONFIG_RELHOME_PATH) 
+        + strlen(username) + 1;
+    configdir = malloc(dir_len);
+
+    strcpy(configdir, "/home/");
+    strcat(configdir, username);
+    free(username);
+    strcat(configdir, "/.local/share/deckshock4/");
+    
+    configpath = malloc(dir_len + strlen(CONFIG_FILE)+1);
+    strcpy(configpath, configdir);
+    strcat(configpath, CONFIG_FILE);
+    
+    mkdir_r(configdir);
+    free(configdir);
+    configfd = open(configpath, O_CREAT );
+    if(configfd == -1)
+        goto use_default_map;
+
+    read_config_json();
+    // set notification on config change
+    inotifd = inotify_init1(IN_NONBLOCK);
+    if(inotifd > 0){
+        inotiwatchfd = inotify_add_watch(inotifd, configpath, IN_MODIFY);
+            if(inotiwatchfd == -1)
+                fputs("Failed to register listener on config.json", stderr);
+    } else fputs("Failed to init inotify", stderr);
+        
+    return;
+
+use_default_map:
+    fputs("Failed to open config file... using inbuilt default mapping\n", stderr);
     memcpy(bool_map, default_bool_map, sizeof(boolitm*)*BOOL_CNT*2);
     memcpy(scalar_map, default_scalar_map, sizeof(scalitm*)*SCALAR_CNT*2);
     memcpy(sensor_map, default_sensor_map, sizeof(scalitm*)*SENSOR_CNT*2);
     memcpy(scalar_inv_map, default_scalar_inv_map, SCALAR_CNT);
     memcpy(sensor_inv_map, default_sensor_inv_map, SENSOR_CNT);
+    return;
 }
+
+void trans_deinit()
+{
+    close(configfd);
+    inotify_rm_watch(inotifd, inotiwatchfd);
+    close(inotifd);
+    free(configpath);
+}
+
+void trans_config_check()
+{ 
+    // check if config modified
+    struct inotify_event * inotev = NULL;
+    size_t count = read(inotifd, inotev, sizeof(struct inotify_event)*10);
+    if(count <= 0) return;
+
+    for(int i = 0; i < count; i++){
+        if(inotev[i].wd == inotiwatchfd && inotev[i].mask & IN_MODIFY){
+            read_config_json();
+        }
+    }
+    
+}
+

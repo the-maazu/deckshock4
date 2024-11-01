@@ -11,12 +11,13 @@
 #include "headers/ds4.h"
 #include "headers/trans.h"
 
-void quit()
+void quit(int status)
 {
     fputs("\nQuitting\n", stderr);
     ds4_destroy();
     sdc_close();
-    exit(EXIT_SUCCESS);
+    trans_deinit();
+    exit(status);
 }
 
 int main(int argc, char **argv)
@@ -31,13 +32,13 @@ int main(int argc, char **argv)
     if (sdc_open() == EXIT_FAILURE)
     {
         fputs("Failed to open SDC\n", stderr);
-        quit();
+        quit(EXIT_FAILURE);
     }
     fputs("Opened SDC successfully\n", stderr);
     if (ds4_create() == EXIT_FAILURE)
     {
         fputs("Failed to create DS4\n", stderr);
-        quit();
+        quit(EXIT_FAILURE);
     }
     fputs("Created DS4 successfully\n", stderr);
 
@@ -57,11 +58,12 @@ int main(int argc, char **argv)
     while(1) 
     {   
         nanosleep(&throttle, NULL);
+        
         ds4_recieve_req();
         sdc_read_report(sdcrep, sizeof(sdcrep));
 
         if(curtp.tv_sec - prevtp.tv_sec > 10)
-            quit(); // quit if steam button held for 10 secs
+            quit(EXIT_SUCCESS); // quit if steam button held for 10 secs
 
         if(sdc_steam_down(sdcrep)) // update current time
             clock_gettime(CLOCK_REALTIME, &curtp);
@@ -71,6 +73,7 @@ int main(int argc, char **argv)
             curtp = prevtp;
         }
 
+        trans_config_check();
         trans_rep_sdc_to_ds4(ds4rep, sdcrep);
         ds4_send_report(ds4rep, REP_SIZE);
     }

@@ -1,34 +1,34 @@
 .SECONDEXPANSION:
 include .env
 
-version := 0.0.2
-objdir := build
+version = 0.0.2
+objdir = build
 objects := $(patsubst src%.c,$(objdir)%.o, $(wildcard src/*.c))
-dbgobjdir := build/debug
+dbgobjdir = build/debug
 dbgobjects := $(patsubst src%.c,$(dbgobjdir)%.o, $(wildcard src/*.c))
 outdir := out
+flags !=  tr '\n' ' ' < compile_flags.txt
 
+# executables
+$(outdir)/deckshock4 : $(objects) | $(outdir)
+	gcc ${flags} $^ -o $@ -lsystemd -lnanojsonc
+.PHONY : debug
+debug : $(outdir)/deckshock4-debug
+$(outdir)/deckshock4-debug : $(dbgobjects) | $(outdir)
+	gcc ${flags} -ggdb $^ -o $@ -lsystemd -lnanojsonc
+$(outdir):
+	mkdir -p $(outdir)
+
+# objects
+$(objects) : $$(patsubst $(objdir)%.o,src%.c, $$@) | $(objdir)
+	gcc ${flags} -c $^ -o $@
+$(dbgobjects) : $$(patsubst $(dbgobjdir)%.o,src%.c, $$@) | $(dbgobjdir)
+	gcc ${flags} -ggdb -c $^ -o $@
 $(objdir):
 	mkdir -p $(objdir)
 $(dbgobjdir):
 	mkdir -p $(dbgobjdir)
 
-$(objects) : $$(patsubst $(objdir)%.o,src%.c, $$@) | $(objdir)
-	gcc -c $^ -o $@
-$(dbgobjects) : $$(patsubst $(dbgobjdir)%.o,src%.c, $$@) | $(dbgobjdir)
-	gcc -ggdb -c $^ -o $@
-
-.PHONY : all
-all : $(outdir)/deckshock4
-.PHONY : debug
-debug : $(outdir)/deckshock4-debug
-
-$(outdir):
-	mkdir -p $(outdir)
-$(outdir)/deckshock4 : $(objects) | $(outdir)
-	gcc $^ -o $@ -lsystemd
-$(outdir)/deckshock4-debug : $(dbgobjects) | $(outdir)
-	gcc -ggdb $^ -o $@ -lsystemd -lnanojsonc
 
 .PHONY: push
 push: $(outdir)/deckshock4-debug
