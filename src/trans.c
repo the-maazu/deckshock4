@@ -1,3 +1,4 @@
+#include <asm-generic/errno.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <string.h>
@@ -7,6 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "headers/rep_items.h"
 #include "parser.h"
 #include <assert.h>
 #include <stdbool.h>
@@ -65,14 +67,20 @@ static const scalitm* default_sensor_map[SENSOR_CNT][2] = {
     {&sdcgyroR, &ds4gyroY},
     {&sdcgyroY, &ds4gyroZ},
 };
-static const uint8_t default_scalar_inv_map[SCALAR_CNT][2] = {0,1,0,1,0,0};
-static const uint8_t default_sensor_inv_map[SENSOR_CNT] = {1,0,0,0,0,1};
+static const uint8_t default_scalar_inv_map[SCALAR_CNT][2] 
+    = {0,1,0,1,0,0};
+static const uint8_t default_sensor_inv_map[SENSOR_CNT] 
+    = {1,0,0,0,0,1};
+static const uint8_t default_sensor_ofst_map[SENSOR_CNT] 
+    = {0,0,0,0,0,0};
 
-static boolitm* bool_map[BOOL_CNT][2];
-static scalitm* scalar_map[SCALAR_CNT][2];
-static scalitm* sensor_map[SENSOR_CNT][2];
-static uint8_t scalar_inv_map[SCALAR_CNT];
-static uint8_t sensor_inv_map[SENSOR_CNT];
+static uint8_t disable = 0;
+static boolitm* bool_map[BOOL_CNT][2] = {NULL};
+static scalitm* scalar_map[SCALAR_CNT][2] = {NULL};
+static scalitm* sensor_map[SENSOR_CNT][2] = {NULL};
+static uint8_t scalar_inv_map[SCALAR_CNT] = {0};
+static uint8_t sensor_inv_map[SENSOR_CNT] = {0};
+static int16_t sensor_ofst_map[SENSOR_CNT] = {0};
 
 inline static void set_bools(char *ds4rep, const char *sdcrep)
 {
@@ -83,6 +91,7 @@ inline static void set_bools(char *ds4rep, const char *sdcrep)
     {
         ds4 = bool_map[i][1];
         sdc = bool_map[i][0];
+        if(ds4 == NULL || sdc == NULL) return;
         sdcval = sdcrep[sdc->bytofst] >> sdc->bitofst & 1;
         ds4rep[ds4->bytofst] |= sdcval << ds4->bitofst;
     }
@@ -93,8 +102,10 @@ inline static void set_scalar(
     const char *sdcrep, 
     const scalitm * ds4itm, 
     const scalitm * sdcitm,
-    const uint8_t invert
+    const uint8_t invert,
+    const uint8_t ofst
 ){
+    if(ds4itm == NULL || sdcitm == NULL) return;
 
     size_t nbyts = sdcitm->nbyts;
     uint8_t s = sdcitm->s;
@@ -133,13 +144,25 @@ inline static void set_scalar(
 inline static void set_scalars(char *ds4rep, const char *sdcrep)
 {
     for (int i = 0; i < SCALAR_CNT; i++)
-        set_scalar(ds4rep, sdcrep, scalar_map[i][1], scalar_map[i][0], scalar_inv_map[i]);
+        set_scalar(
+            ds4rep, sdcrep, 
+            scalar_map[i][1], 
+            scalar_map[i][0], 
+            scalar_inv_map[i], 
+            0
+        );
 }
 
 inline static void set_sensors(char *ds4rep, const char *sdcrep)
 {
     for (int i = 0; i < SENSOR_CNT; i++)
-        set_scalar(ds4rep, sdcrep, sensor_map[i][1], sensor_map[i][0], sensor_inv_map[i]);
+        set_scalar(
+            ds4rep, sdcrep, 
+            sensor_map[i][1],
+            sensor_map[i][0],
+            sensor_inv_map[i],
+            sensor_ofst_map[i]
+        );
 }
 
 inline static void set_dpad(char *ds4rep, const char *sdcrep)
@@ -175,11 +198,11 @@ inline static void set_dpad(char *ds4rep, const char *sdcrep)
         ds4rep[ds4dpad.bytofst] |= DS4_DPAD_O;
 }
 
-typedef enum tpadside {lefttpad, righttpad} tpadside;
+enum TpadSide {LeftTpad, RightTpad};
 static void set_tpad_f1 (
     char * ds4rep, 
     const char * sdcrep,
-    const tpadside tpadside,
+    const enum TpadSide tpadside,
     const boolitm * tchsrc,
     const scalitm * scalX,
     const scalitm * scalY
@@ -193,7 +216,7 @@ static void set_tpad_f1 (
 
     if (touch)
     {
-        X = tpadside == lefttpad ?
+        X = tpadside == LeftTpad ?
             (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
             : (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
         Y = 800 - (float) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
@@ -216,7 +239,7 @@ static void set_tpad_f1 (
 inline static void set_tpad_f2(
     char * ds4rep, 
     const char * sdcrep, 
-    const tpadside tpadside,
+    const enum TpadSide tpadside,
     const boolitm * tchsrc,
     const scalitm * scalX,
     const scalitm * scalY
@@ -229,7 +252,7 @@ inline static void set_tpad_f2(
 
     if (touch)
     {
-        X = tpadside == lefttpad ?
+        X = tpadside == LeftTpad ?
             (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
             : (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
         Y = 800 - (float) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
@@ -250,12 +273,16 @@ inline static void set_tpad_f2(
 }
 
 typedef enum touch_mode {leftfrst, righfrst} touch_mode;
-inline static void set_tpad(char *ds4rep, const char *sdcrep, uint8_t tpadtime, uint8_t timeinc)
-{
+inline static void set_tpad(
+    char *ds4rep, const char *sdcrep, 
+    uint8_t tpadtime, uint8_t timeinc
+){
     static uint8_t prevtouch;
     static touch_mode mode;
-    uint8_t curtouch = (sdcrep[sdcrtpadtouch.bytofst] >> sdcrtpadtouch.bitofst) & 1;
-    curtouch |= (sdcrep[sdcltpadtouch.bytofst] >> (sdcltpadtouch.bitofst - 1)) & 2;
+    uint8_t curtouch 
+        = (sdcrep[sdcrtpadtouch.bytofst] >> sdcrtpadtouch.bitofst) & 1;
+    curtouch 
+        |= (sdcrep[sdcltpadtouch.bytofst] >> (sdcltpadtouch.bitofst - 1)) & 2;
 
     if( prevtouch == 0 && curtouch == 1)
         mode = righfrst;
@@ -265,16 +292,41 @@ inline static void set_tpad(char *ds4rep, const char *sdcrep, uint8_t tpadtime, 
 
     if (mode == leftfrst )
     {
-        set_tpad_f1(ds4rep, sdcrep, lefttpad, &sdcltpadtouch ,&sdcltpadX, &sdcltpadY);
-        set_tpad_f2(ds4rep, sdcrep, righttpad, &sdcrtpadtouch ,&sdcrtpadX, &sdcrtpadY);
+        set_tpad_f1(
+            ds4rep, sdcrep, 
+            LeftTpad, // left tpad as 1st finger
+            &sdcltpadtouch,
+            &sdcltpadX,
+            &sdcltpadY
+        );
+        set_tpad_f2(
+            ds4rep, sdcrep,
+            RightTpad, // right tpad as 2nd finger
+            &sdcrtpadtouch,
+            &sdcrtpadX,
+            &sdcrtpadY
+        );
     }
     else
     {
-        set_tpad_f1(ds4rep, sdcrep, righttpad, &sdcrtpadtouch ,&sdcrtpadX, &sdcrtpadY);
-        set_tpad_f2(ds4rep, sdcrep, lefttpad, &sdcltpadtouch ,&sdcltpadX, &sdcltpadY);
+        set_tpad_f1(
+            ds4rep, sdcrep,
+            RightTpad, // right tpad as 1st finger
+            &sdcrtpadtouch,
+            &sdcrtpadX,
+            &sdcrtpadY
+        );
+        set_tpad_f2(
+            ds4rep, sdcrep,
+            LeftTpad, // left tpad as 2nd finger
+            &sdcltpadtouch,
+            &sdcltpadX,
+            &sdcltpadY
+        );
     }
 
-    ds4rep[ds4tpadtime.bytofst] = tpadtime + (curtouch ? timeinc : 0);
+    ds4rep[ds4tpadtime.bytofst] 
+        = tpadtime + (curtouch ? timeinc : 0);
 }
 
 void trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
@@ -309,14 +361,16 @@ void trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
     prevtp = curtp;
 }
 
+// Configuration
 #define CONFIG_FILE "config.json"
-#define CONFIG_RELHOME_PATH "/.local/share/deckshock4/"
+#define CONFIG_HOMEREL_PATH "/.local/share/deckshock4/"
+
 static char * configpath = NULL;
-static int configfd;
 static int inotifd;
 static int inotiwatchfd;
 
-static int mkdir_r(const char *dir) {
+static int mkdir_p(const char *dir) 
+{
     char tmp[256];
     char *p = NULL;
     size_t len;
@@ -335,15 +389,81 @@ static int mkdir_r(const char *dir) {
     return EXIT_SUCCESS;
 }
 
-enum AccelEnum{ accelX, accelY, acceslZ};
+enum SdcAccelEnum{ SdcAccelDsbl=-1, SdcAccelDflt, SdcAccelX, SdcAccelY, SdcAccelZ};
+
 struct Config {
-    uint8_t disable;
-    enum AccelEnum accelX;
-    enum AccelEnum accelY;
-    enum AccelEnum accelZ;
+    // uint8_t disable;
+    enum SdcAccelEnum accelX;
+    enum SdcAccelEnum accelY;
+    enum SdcAccelEnum accelZ;
+    uint8_t invaccelX;
+    uint8_t invaccelY;
+    uint8_t invaccelZ;
+    uint8_t accelX_ofst;
+    uint8_t accelY_ofst;
+    uint8_t accelZ_ofst;
 };
 
-static void update_maps(
+static void update_button_maps(struct Config * config)
+{
+    if(config == NULL) return;
+
+    switch (config->accelX) {
+        case SdcAccelX:
+            sensor_map[0][0] = (scalitm *) &sdcaccelX;
+            break;
+        case SdcAccelY:
+            sensor_map[0][0] = (scalitm *)  &sdcaccelY;
+            break;
+        case SdcAccelZ:
+            sensor_map[0][0] = (scalitm *)  &sdcaccelZ;
+            break;
+        case SdcAccelDflt:
+            sensor_map[0][0] = (scalitm *) &sdcaccelX;
+            break;
+        case SdcAccelDsbl:
+            sensor_map[0][0] = NULL;
+            break;
+    }
+
+    switch (config->accelY) {
+        case SdcAccelX:
+            sensor_map[1][0] = (scalitm *) &sdcaccelX;
+            break;
+        case SdcAccelY:
+            sensor_map[1][0] = (scalitm *)  &sdcaccelY;
+            break;
+        case SdcAccelZ:
+            sensor_map[1][0] = (scalitm *)  &sdcaccelZ;
+            break;
+        case SdcAccelDflt:
+            sensor_map[1][0] = (scalitm *)  &sdcaccelY;;
+            break;
+        case SdcAccelDsbl:
+            sensor_map[1][0] = NULL;
+            break;
+    }
+
+    switch (config->accelZ) {
+        case SdcAccelX:
+            sensor_map[2][0] = (scalitm *) &sdcaccelX;
+            break;
+        case SdcAccelY:
+            sensor_map[2][0] = (scalitm *)  &sdcaccelY;
+            break;
+        case SdcAccelZ:
+            sensor_map[2][0] = (scalitm *)  &sdcaccelZ;
+            break;
+        case SdcAccelDflt:
+            sensor_map[2][0] = (scalitm *)  &sdcaccelZ;
+            break;
+        case SdcAccelDsbl:
+            sensor_map[2][0] = NULL;
+            break;
+    }
+}
+
+static void parse_config(
     enum NanoJSONCError error, 
     const char *const key, 
     const char *const value, 
@@ -360,12 +480,33 @@ static void update_maps(
 
     if (*config == NULL) {
         *config = malloc(sizeof(struct Config));
-        **config = (struct Config){0}; // Initialize all members to 0
+        **config = (struct Config){
+            // .disable = 0,
+            .accelX = SdcAccelDflt,
+            .accelY = SdcAccelDflt,
+            .accelZ = SdcAccelDflt,
+            .invaccelX = default_sensor_inv_map[0],
+            .invaccelY = default_sensor_inv_map[1],
+            .invaccelZ = default_sensor_inv_map[2],
+            .accelX_ofst = default_sensor_ofst_map[0],
+            .accelY_ofst = default_sensor_ofst_map[1],
+            .accelZ_ofst = default_sensor_ofst_map[2],
+        };
+    }
+
+    if (strcmp(parentKey, "config") == 0) {
+        if (strcmp(key, "disable") == 0) disable = atoi(value);
+        if (strcmp(key, "accelX") == 0) (*config)->accelX = atoi(value);
+        if (strcmp(key, "accelY") == 0) (*config)->accelY = atoi(value);
+        if (strcmp(key, "accelY") == 0) (*config)->accelY = atoi(value);
+        if (strcmp(key, "invaccelX") == 0) (*config)->accelX = atoi(value);
+        if (strcmp(key, "invaccelY") == 0) (*config)->accelY = atoi(value);
+        if (strcmp(key, "invaccelZ") == 0) (*config)->accelZ = atoi(value);
     }
 }
 
-static int read_config_json() {
-    FILE *file = fdopen(configfd, "rb");
+static int read_parse_config() {
+    FILE *file = fopen(configpath, "rb");
     if (file == NULL) {
         fprintf(stderr, "Error: %d: %s\n", errno, strerror(errno));
         return errno;
@@ -404,13 +545,44 @@ static int read_config_json() {
     fclose(file);
 
     struct Config *config = NULL;
+    
     nanojsonc_parse_object(
         buffer, "config", 
-        &config, update_maps
+        &config, parse_config
     );
+    if(config == NULL) fputs("Failed to parse config\n", stderr);
+    else fputs("Parsed config successfully\n", stderr);
+    update_button_maps(config);
 
+    free(config);
     free(buffer);
     return 0;
+}
+
+static void set_notifier()
+{
+    // set notification on config change
+    inotifd = inotify_init1(O_NONBLOCK);
+    if(inotifd > 0){
+        inotiwatchfd = inotify_add_watch(inotifd, configpath, IN_MODIFY);
+            if(inotiwatchfd == -1)
+                fputs("Failed to register listener on config.json", stderr);
+    } else fputs("Failed to init inotify", stderr);
+}
+
+static void clear_notifier()
+{
+    inotify_rm_watch(inotifd, inotiwatchfd);
+    close(inotifd);
+}
+
+static void apply_default_map()
+{
+    memcpy(bool_map, default_bool_map, sizeof(boolitm*)*BOOL_CNT*2);
+    memcpy(scalar_map, default_scalar_map, sizeof(scalitm*)*SCALAR_CNT*2);
+    memcpy(sensor_map, default_sensor_map, sizeof(scalitm*)*SENSOR_CNT*2);
+    memcpy(scalar_inv_map, default_scalar_inv_map, SCALAR_CNT);
+    memcpy(sensor_inv_map, default_sensor_inv_map, SENSOR_CNT);
 }
 
 void trans_init()
@@ -418,75 +590,70 @@ void trans_init()
     struct stat st = {0};
     char * username = NULL;
     char * configdir = NULL;
+    int configfd;
     
-    username = getlogin();
+    apply_default_map();
+
+    username = getlogin(); // username statically allocated
     if(username == NULL) 
     {
-        fputs("Could not retrieve username\n", stderr);
-        goto use_default_map;
+        fputs("Failed to retrieve home directory... using inbuilt default mapping\n", stderr);
+        return;
     }
 
     size_t dir_len = strlen("/home/") 
-        + strlen(CONFIG_RELHOME_PATH) 
+        + strlen(CONFIG_HOMEREL_PATH) 
         + strlen(username) + 1;
     configdir = malloc(dir_len);
 
     strcpy(configdir, "/home/");
     strcat(configdir, username);
-    free(username);
     strcat(configdir, "/.local/share/deckshock4/");
     
     configpath = malloc(dir_len + strlen(CONFIG_FILE)+1);
     strcpy(configpath, configdir);
     strcat(configpath, CONFIG_FILE);
     
-    mkdir_r(configdir);
+    mkdir_p(configdir);
     free(configdir);
     configfd = open(configpath, O_CREAT );
-    if(configfd == -1)
-        goto use_default_map;
+    if(configfd == -1){
+        fputs("Failed to open config file... using inbuilt default mapping\n", stderr);
+        return;
+    }
 
-    read_config_json();
-    // set notification on config change
-    inotifd = inotify_init1(IN_NONBLOCK);
-    if(inotifd > 0){
-        inotiwatchfd = inotify_add_watch(inotifd, configpath, IN_MODIFY);
-            if(inotiwatchfd == -1)
-                fputs("Failed to register listener on config.json", stderr);
-    } else fputs("Failed to init inotify", stderr);
-        
+    read_parse_config();
+    set_notifier();
+    close(configfd);
     return;
+}
 
-use_default_map:
-    fputs("Failed to open config file... using inbuilt default mapping\n", stderr);
-    memcpy(bool_map, default_bool_map, sizeof(boolitm*)*BOOL_CNT*2);
-    memcpy(scalar_map, default_scalar_map, sizeof(scalitm*)*SCALAR_CNT*2);
-    memcpy(sensor_map, default_sensor_map, sizeof(scalitm*)*SENSOR_CNT*2);
-    memcpy(scalar_inv_map, default_scalar_inv_map, SCALAR_CNT);
-    memcpy(sensor_inv_map, default_sensor_inv_map, SENSOR_CNT);
-    return;
+void trans_config_probe()
+{
+    struct inotify_event * inotev = malloc(sizeof(struct inotify_event));
+    size_t count = read(inotifd, inotev, sizeof(struct inotify_event));
+    if(count == sizeof(struct inotify_event)){
+        if(inotev->wd == inotiwatchfd && inotev->mask & IN_MODIFY){
+            fputs("Config file modified... updating config\n", stderr);
+            read_parse_config();
+        }
+    } else if(errno == EBADF) {
+        // Bad fd after editing file with Kate
+        // Setup new notifier if bad fd
+        clear_notifier();
+        set_notifier();
+    }
+    free(inotev);
 }
 
 void trans_deinit()
 {
-    close(configfd);
-    inotify_rm_watch(inotifd, inotiwatchfd);
-    close(inotifd);
     free(configpath);
+    clear_notifier();
 }
 
-void trans_config_check()
-{ 
-    // check if config modified
-    struct inotify_event * inotev = NULL;
-    size_t count = read(inotifd, inotev, sizeof(struct inotify_event)*10);
-    if(count <= 0) return;
-
-    for(int i = 0; i < count; i++){
-        if(inotev[i].wd == inotiwatchfd && inotev[i].mask & IN_MODIFY){
-            read_config_json();
-        }
-    }
-    
+uint8_t trans_is_disabled()
+{
+    return disable;   
 }
 

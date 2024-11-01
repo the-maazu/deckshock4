@@ -303,7 +303,7 @@ static int uhid_write( const struct uhid_event *ev)
 		return -errno;
 	} else if (ret != sizeof(*ev)) {
 		fprintf(stderr, "Wrong size written to uhid: %zd != %zu\n",
-			ret, sizeof(ev));
+			ret, sizeof(*ev));
 		return -EFAULT;
 	} else {
 		return 0;
@@ -327,7 +327,7 @@ int ds4_create()
 	memset(&ev, 0, sizeof(ev));
 	ev.type = UHID_CREATE2;
 	strcpy((char *) ev.u.create2.name, "Sony Computer Entertainment Wireless Controller");
-    strcpy(ev.u.create2.uniq, "1C:66:6D:07:09:8B:81");
+    strcpy((char *) ev.u.create2.uniq, "1C:66:6D:07:09:8B:81");
     // strcpy((char *) ev.u.create2.phys, "usb-xhci-hcd.2.auto-1.4/input0");
 	// strcpy((char *) ev.u.create2.phys, "usb-0000:04:00.3-1.1/input0");
     memcpy(ev.u.create2.rd_data, ds4rdesc, sizeof(ds4rdesc));

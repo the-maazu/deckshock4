@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
 #include <time.h>
 #include "headers/sdc.h"
 #include "headers/ds4.h"
@@ -43,7 +44,7 @@ int main(int argc, char **argv)
     fputs("Created DS4 successfully\n", stderr);
 
     trans_init();
-    
+
     // should help smoothen sensors
     const struct timespec throttle = {
         .tv_sec = 0,
@@ -57,11 +58,22 @@ int main(int argc, char **argv)
 
     while(1) 
     {   
-        nanosleep(&throttle, NULL);
+        trans_config_probe();
+        if(trans_is_disabled())
+        {   
+            fputs("Disabling virtual controller\n", stderr);
+            ds4_destroy();
+            while(trans_is_disabled())
+            {
+                trans_config_probe();
+            }
+            ds4_create();
+        }
+            
         
-        ds4_recieve_req();
-        sdc_read_report(sdcrep, sizeof(sdcrep));
+        nanosleep(&throttle, NULL);
 
+        // steam button routine
         if(curtp.tv_sec - prevtp.tv_sec > 10)
             quit(EXIT_SUCCESS); // quit if steam button held for 10 secs
 
@@ -72,8 +84,10 @@ int main(int argc, char **argv)
             clock_gettime(CLOCK_REALTIME, &prevtp);
             curtp = prevtp;
         }
-
-        trans_config_check();
+        
+        // translation
+        ds4_recieve_req();
+        sdc_read_report(sdcrep, sizeof(sdcrep));
         trans_rep_sdc_to_ds4(ds4rep, sdcrep);
         ds4_send_report(ds4rep, REP_SIZE);
     }

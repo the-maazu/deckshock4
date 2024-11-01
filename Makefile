@@ -11,11 +11,11 @@ flags !=  tr '\n' ' ' < compile_flags.txt
 
 # executables
 $(outdir)/deckshock4 : $(objects) | $(outdir)
-	gcc ${flags} $^ -o $@ -lsystemd -lnanojsonc
+	gcc ${flags} $^ -o $@ -lsystemd -lnanojsonc -lpthread
 .PHONY : debug
 debug : $(outdir)/deckshock4-debug
 $(outdir)/deckshock4-debug : $(dbgobjects) | $(outdir)
-	gcc ${flags} -ggdb $^ -o $@ -lsystemd -lnanojsonc
+	gcc ${flags} -ggdb $^ -o $@ -lsystemd -lnanojsonc -lpthread
 $(outdir):
 	mkdir -p $(outdir)
 
