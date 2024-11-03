@@ -1,7 +1,7 @@
 .SECONDEXPANSION:
 include .env
 
-version = 0.0.2
+version = 0.1.0
 objdir = build
 objects := $(patsubst src%.c,$(objdir)%.o, $(wildcard src/*.c))
 dbgobjdir = build/debug
@@ -36,7 +36,7 @@ push: $(outdir)/deckshock4-debug
 
 .PHONY: package
 package : deckshock4-v$(version).tar.gz
-deckshock4-v$(version).tar.gz : $(objdir)/deckshock4 scripts/uninstall.sh scripts/install.sh etc | $(outdir)
+deckshock4-v$(version).tar.gz : $(outdir)/deckshock4 scripts/uninstall.sh scripts/install.sh etc
 	tar -cz etc -C$(outdir) deckshock4 -C"../scripts" install.sh uninstall.sh > deckshock4-v$(version).tar.gz
 
 .PHONY: clean

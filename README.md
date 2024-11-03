@@ -14,6 +14,29 @@ DualShock® 4 emulator for Steam Deck®
    - or close the terminal.
 6. To uninstall, open terminal in extracted subfolder and execute <code>$ ./uninstall.sh</code>
 
+## Configuration (from v0.1.0)
+A config file should be created in the home directory <code>$~/.local/share/deckshock4/config.json</code>.
+deckshock4 will fallback to an inbuilt default equivalent to the config below, should confi.json be malformed or empty (tested with RPCS3).
+
+You can mix up the mapping to <code>accelX</code>,<code>accelY</code> and <code>accelZ</code> with values 0,1 and 2 and adjust offset(orientation) as you see fit. <code>disable</code> and <code>invaccel</code> (reverse axis) are intepreted as <code>false</code> for "0" and <code>true</code> for non-zero values.
+
+<pre><code>
+{
+    "disable": 0,
+    "accelX": 0,
+    "accelY": 1,
+    "accelZ": 2,
+    "invaccelX": 0,
+    "invaccelY": 0,
+    "invaccelZ": 0,
+    "accelXofst": 0,
+    "accelYofst": -5000,
+    "accelZofst": -13000
+}
+</code></pre>
+
+In the future this will be controlled with a frontend decky-plugin.
+
 ### Controller Settings & Steam Client Considerations
 Input is duplicated while **deckshock4** is running;
 

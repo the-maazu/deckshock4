@@ -65,6 +65,7 @@ int main(int argc, char **argv)
             ds4_destroy();
             while(trans_is_disabled())
             {
+                sleep(1); // throttle probe
                 trans_config_probe();
             }
             ds4_create();
@@ -77,9 +78,8 @@ int main(int argc, char **argv)
         if(curtp.tv_sec - prevtp.tv_sec > 10)
             quit(EXIT_SUCCESS); // quit if steam button held for 10 secs
 
-        if(sdc_steam_down(sdcrep)) // update current time
-            clock_gettime(CLOCK_REALTIME, &curtp);
-        else 
+        clock_gettime(CLOCK_REALTIME, &curtp);            
+        if(!sdc_steam_down(sdcrep))
         { // reset time delta
             clock_gettime(CLOCK_REALTIME, &prevtp);
             curtp = prevtp;
