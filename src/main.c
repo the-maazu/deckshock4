@@ -6,17 +6,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
 #include <time.h>
 #include "headers/sdc.h"
 #include "headers/ds4.h"
 #include "headers/trans.h"
 
-void quit()
+void quit(int status)
 {
     fputs("\nQuitting\n", stderr);
     ds4_destroy();
     sdc_close();
-    exit(EXIT_SUCCESS);
+    trans_deinit();
+    exit(status);
 }
 
 int main(int argc, char **argv)
@@ -31,16 +33,18 @@ int main(int argc, char **argv)
     if (sdc_open() == EXIT_FAILURE)
     {
         fputs("Failed to open SDC\n", stderr);
-        quit();
+        quit(EXIT_FAILURE);
     }
     fputs("Opened SDC successfully\n", stderr);
     if (ds4_create() == EXIT_FAILURE)
     {
         fputs("Failed to create DS4\n", stderr);
-        quit();
+        quit(EXIT_FAILURE);
     }
     fputs("Created DS4 successfully\n", stderr);
-    
+
+    trans_init();
+
     // should help smoothen sensors
     const struct timespec throttle = {
         .tv_sec = 0,
@@ -54,23 +58,37 @@ int main(int argc, char **argv)
 
     while(1) 
     {   
-        ds4_recieve_req();
-        sdc_read_report(sdcrep, sizeof(sdcrep));
+        trans_config_probe();
+        if(trans_is_disabled())
+        {   
+            fputs("Disabling virtual controller\n", stderr);
+            ds4_destroy();
+            while(trans_is_disabled())
+            {
+                sleep(1); // throttle probe
+                trans_config_probe();
+            }
+            ds4_create();
+        }
+            
+        
+        nanosleep(&throttle, NULL);
 
+        // steam button routine
         if(curtp.tv_sec - prevtp.tv_sec > 10)
-            quit(); // quit if steam button held for 10 secs
+            quit(EXIT_SUCCESS); // quit if steam button held for 10 secs
 
-        if(sdc_steam_down(sdcrep)) // update current time
-            clock_gettime(CLOCK_REALTIME, &curtp);
-        else 
+        clock_gettime(CLOCK_REALTIME, &curtp);            
+        if(!sdc_steam_down(sdcrep))
         { // reset time delta
             clock_gettime(CLOCK_REALTIME, &prevtp);
             curtp = prevtp;
         }
-
+        
+        // translation
+        ds4_recieve_req();
+        sdc_read_report(sdcrep, sizeof(sdcrep));
         trans_rep_sdc_to_ds4(ds4rep, sdcrep);
         ds4_send_report(ds4rep, REP_SIZE);
-
-        nanosleep(&throttle, NULL);
     }
 }
