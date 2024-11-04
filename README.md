@@ -15,8 +15,8 @@ DualShock® 4 emulator for Steam Deck®
 6. To uninstall, open terminal in extracted subfolder and execute <code>$ ./uninstall.sh</code>
 
 ## Configuration (from v0.1.0)
-A config file should be created in the home directory <code>$~/.local/share/deckshock4/config.json</code>.
-deckshock4 will fallback to an inbuilt default equivalent to the config below, should confi.json be malformed or empty (tested with RPCS3).
+A config file should be created in the home directory <code>~/.local/share/deckshock4/config.json</code>.
+deckshock4 will fallback to an inbuilt default equivalent to the config below, should config.json be malformed or empty (tested with RPCS3).
 
 You can mix up the mapping to <code>accelX</code>,<code>accelY</code> and <code>accelZ</code> with values 0,1 and 2 and adjust offset(orientation) as you see fit. <code>disable</code> and <code>invaccel</code> (reverse axis) are intepreted as <code>false</code> for "0" and <code>true</code> for non-zero values.
 
