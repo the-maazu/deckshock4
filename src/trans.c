@@ -417,8 +417,13 @@ static void update_accel_map( enum Ds4AccelEnum e, uint8_t row )
         case Ds4AccelNone:
             sensor_map[row][1] = NULL;
             break;
-        default:
+        case Ds4AccelX:
+        case Ds4AccelY:
+        case Ds4AccelZ:
             sensor_map[row][1] = (scalitm *) default_sensor_map[e][1];
+            break;
+        default:
+            fputs("Invalid accel mapping, check config.json\n", stderr);
     }
 }
 
