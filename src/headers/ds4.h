@@ -1,5 +1,6 @@
 #ifndef DS4
 #define DS4
+
 #include <stdlib.h>
 
 int ds4_create();

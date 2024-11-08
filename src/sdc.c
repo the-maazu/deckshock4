@@ -7,7 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "headers/sdc_items.h"
+
+#include "headers/items.h"
 
 static int sdcfd;
 static int sdcvgpfd;
@@ -121,5 +122,5 @@ int sdc_read_report(char* buf, size_t nbyts)
 
 uint8_t sdc_steam_down(const char* buf)
 {
-    return (buf[sdcSTEAM.bytofst] >> sdcSTEAM.bitofst) & 1;
+    return (buf[sdcSTEAM.byte] >> sdcSTEAM.bit) & 1;
 }

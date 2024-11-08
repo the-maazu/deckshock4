@@ -12,16 +12,14 @@
 
 #include "parser.h"
 
-#include "headers/rep_items.h"
 #include "headers/trans.h"
-#include "headers/ds4_items.h"
-#include "headers/sdc_items.h"
+#include "headers/items.h"
 
 #define BOOL_CNT 15
 #define SCALAR_CNT 6
 #define SENSOR_CNT 6
 
-static const boolitm* default_bool_map[BOOL_CNT][2] = {
+static const bool_item* default_bool_map[BOOL_CNT][2] = {
     // face buttons
     {&sdcA, &ds4X},
     {&sdcB, &ds4O},
@@ -43,7 +41,7 @@ static const boolitm* default_bool_map[BOOL_CNT][2] = {
     {&sdcL3, &ds4L3},
     {&sdcR3, &ds4R3},
 };
-static const scalitm* default_scalar_map[SCALAR_CNT][2] = {
+static const scalar_item* default_scalar_map[SCALAR_CNT][2] = {
      // sticks
     {&sdclstickX, &ds4lstickX},
     {&sdclstickY, &ds4lstickY},
@@ -53,7 +51,7 @@ static const scalitm* default_scalar_map[SCALAR_CNT][2] = {
     {&sdcL2, &ds4L2},
     {&sdcR2, &ds4R2},
 };
-static const scalitm* default_sensor_map[SENSOR_CNT][2] = {
+static const scalar_item* default_sensor_map[SENSOR_CNT][2] = {
      //  accelerometer
     {&sdcaccelX, &ds4accelX},
     {&sdcaccelY, &ds4accelY},
@@ -70,41 +68,41 @@ static const int16_t default_sensor_ofst_map[SENSOR_CNT]
     = {0,-5000,-13000,0,0,0};
 
 static uint8_t disable = 0;
-static boolitm* bool_map[BOOL_CNT][2] = {NULL};
-static scalitm* scalar_map[SCALAR_CNT][2] = {NULL};
+static bool_item* bool_map[BOOL_CNT][2] = {NULL};
+static scalar_item* scalar_map[SCALAR_CNT][2] = {NULL};
 static uint8_t scalar_inv_map[SCALAR_CNT] = {0};
-static scalitm* sensor_map[SENSOR_CNT][2] = {NULL};
+static scalar_item* sensor_map[SENSOR_CNT][2] = {NULL};
 static uint8_t sensor_inv_map[SENSOR_CNT] = {0};
 static int16_t sensor_ofst_map[SENSOR_CNT] = {0};
 
 inline static void set_bools(char *ds4rep, const char *sdcrep)
 {
-    const boolitm *ds4;
-    const boolitm *sdc;
+    const bool_item *ds4;
+    const bool_item *sdc;
     uint8_t sdcval;
     for (int i = 0; i < BOOL_CNT; i++)
     {
         ds4 = bool_map[i][1];
         sdc = bool_map[i][0];
         if(ds4 == NULL || sdc == NULL) return;
-        sdcval = sdcrep[sdc->bytofst] >> sdc->bitofst & 1;
-        ds4rep[ds4->bytofst] |= sdcval << ds4->bitofst;
+        sdcval = sdcrep[sdc->byte] >> sdc->bit & 1;
+        ds4rep[ds4->byte] |= sdcval << ds4->bit;
     }
 }
 
 inline static void set_scalar(
     char *ds4rep, 
     const char *sdcrep, 
-    const scalitm * ds4itm, 
-    const scalitm * sdcitm,
+    const scalar_item * ds4itm, 
+    const scalar_item * sdcitm,
     const uint8_t invert,
     const int16_t offset
 ){
     if(ds4itm == NULL || sdcitm == NULL) return;
 
-    size_t nbyts = sdcitm->nbyts;
+    size_t nbyts = sdcitm->size;
     uint8_t s = sdcitm->s;
-    uint8_t bytofst = sdcitm->bytofst;
+    uint8_t bytofst = sdcitm->byte;
     int32_t max = sdcitm->max;
     int32_t min = sdcitm->min;
 
@@ -124,9 +122,9 @@ inline static void set_scalar(
     norm += offset;
     norm = (norm - min)/(max - min); // normalise from 0 to 1;
 
-    nbyts = ds4itm->nbyts;
+    nbyts = ds4itm->size;
     s = ds4itm->s;
-    bytofst = ds4itm->bytofst;
+    bytofst = ds4itm->byte;
     max = ds4itm->max;
     min = ds4itm->min;
 
@@ -163,35 +161,35 @@ inline static void set_sensors(char *ds4rep, const char *sdcrep)
 
 inline static void set_dpad(char *ds4rep, const char *sdcrep)
 {
-    uint8_t left = sdcrep[sdcdpadL.bytofst] & (1 << sdcdpadL.bitofst);
-    uint8_t right = sdcrep[sdcdpadR.bytofst] & (1 << sdcdpadR.bitofst);
-    uint8_t up = sdcrep[sdcdpadU.bytofst] & (1 << sdcdpadU.bitofst);
-    uint8_t down = sdcrep[sdcdpadD.bytofst] & (1 << sdcdpadD.bitofst);
+    uint8_t left = sdcrep[sdcdpadL.byte] & (1 << sdcdpadL.bit);
+    uint8_t right = sdcrep[sdcdpadR.byte] & (1 << sdcdpadR.bit);
+    uint8_t up = sdcrep[sdcdpadU.byte] & (1 << sdcdpadU.bit);
+    uint8_t down = sdcrep[sdcdpadD.byte] & (1 << sdcdpadD.bit);
 
     if(left)
     {
         if(up)
-            ds4rep[ds4dpad.bytofst] |= DS4_DPAD_NW;
+            ds4rep[ds4dpad.byte] |= DS4_DPAD_NW;
         else if(down)
-            ds4rep[ds4dpad.bytofst] |= DS4_DPAD_SW;
+            ds4rep[ds4dpad.byte] |= DS4_DPAD_SW;
         else
-            ds4rep[ds4dpad.bytofst] |= DS4_DPAD_W;
+            ds4rep[ds4dpad.byte] |= DS4_DPAD_W;
     } 
     else if(right)
     {
         if(up)
-            ds4rep[ds4dpad.bytofst] |= DS4_DPAD_NE;
+            ds4rep[ds4dpad.byte] |= DS4_DPAD_NE;
         else if(down)
-            ds4rep[ds4dpad.bytofst] |= DS4_DPAD_SE;
+            ds4rep[ds4dpad.byte] |= DS4_DPAD_SE;
         else
-            ds4rep[ds4dpad.bytofst] |= DS4_DPAD_E;        
+            ds4rep[ds4dpad.byte] |= DS4_DPAD_E;        
     }
     else if (up)
-        ds4rep[ds4dpad.bytofst] |= DS4_DPAD_N;
+        ds4rep[ds4dpad.byte] |= DS4_DPAD_N;
     else if (down)
-        ds4rep[ds4dpad.bytofst] |= DS4_DPAD_S;
+        ds4rep[ds4dpad.byte] |= DS4_DPAD_S;
     else 
-        ds4rep[ds4dpad.bytofst] |= DS4_DPAD_O;
+        ds4rep[ds4dpad.byte] |= DS4_DPAD_O;
 }
 
 enum TpadSide {LeftTpad, RightTpad};
@@ -199,35 +197,35 @@ static void set_tpad_f1 (
     char * ds4rep, 
     const char * sdcrep,
     const enum TpadSide tpadside,
-    const boolitm * tchsrc,
-    const scalitm * scalX,
-    const scalitm * scalY
+    const bool_item * tchsrc,
+    const scalar_item * scalX,
+    const scalar_item * scalY
 ){
     
     static uint8_t prevtch;
     static uint8_t count;
     static uint8_t cord[3];
-    uint8_t touch = (sdcrep[tchsrc->bytofst] >> tchsrc->bitofst) & 1;
+    uint8_t touch = (sdcrep[tchsrc->byte] >> tchsrc->bit) & 1;
     uint16_t X, Y;
 
     if (touch)
     {
         X = tpadside == LeftTpad ?
-            (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
-            : (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
-        Y = 800 - (float) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
+            (float) (*(int16_t *)&sdcrep[scalX->byte] - INT16_MIN) / UINT16_MAX * 1024
+            : (float) (*(int16_t *)&sdcrep[scalX->byte] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
+        Y = 800 - (float) (*(int16_t *)&sdcrep[scalY->byte] - INT16_MIN) / UINT16_MAX * 800;
 
-        ds4rep[ds4tpadf1touch.bytofst] = (count & 0x7F);
-        ds4rep[ds4tpadf1touch.bytofst + 1] |= X;
-        ds4rep[ds4tpadf1touch.bytofst + 2] |= X >> 8;
-        ds4rep[ds4tpadf1touch.bytofst + 2] |= Y << 4 ;
-        ds4rep[ds4tpadf1touch.bytofst + 3] |= Y >> 4;
-        memcpy( cord, &ds4rep[ds4tpadf1touch.bytofst + 1], 3);
+        ds4rep[ds4tpadf1touch.byte] = (count & 0x7F);
+        ds4rep[ds4tpadf1touch.byte + 1] |= X;
+        ds4rep[ds4tpadf1touch.byte + 2] |= X >> 8;
+        ds4rep[ds4tpadf1touch.byte + 2] |= Y << 4 ;
+        ds4rep[ds4tpadf1touch.byte + 3] |= Y >> 4;
+        memcpy( cord, &ds4rep[ds4tpadf1touch.byte + 1], 3);
     } else
     {
-        ds4rep[ds4tpadf1touch.bytofst] = 0x80;
-        ds4rep[ds4tpadf1touch.bytofst] |= (prevtch ? ++count : count) & 0x7F;
-        memcpy( &ds4rep[ds4tpadf1touch.bytofst + 1],  cord, 3);
+        ds4rep[ds4tpadf1touch.byte] = 0x80;
+        ds4rep[ds4tpadf1touch.byte] |= (prevtch ? ++count : count) & 0x7F;
+        memcpy( &ds4rep[ds4tpadf1touch.byte + 1],  cord, 3);
     }
     prevtch = touch;
 }
@@ -236,34 +234,34 @@ inline static void set_tpad_f2(
     char * ds4rep, 
     const char * sdcrep, 
     const enum TpadSide tpadside,
-    const boolitm * tchsrc,
-    const scalitm * scalX,
-    const scalitm * scalY
+    const bool_item * tchsrc,
+    const scalar_item * scalX,
+    const scalar_item * scalY
 ){
     static uint8_t prevtch;
     static uint8_t count;
     static uint8_t cord[3];
-    uint8_t touch = (sdcrep[tchsrc->bytofst] >> tchsrc->bitofst) & 1;
+    uint8_t touch = (sdcrep[tchsrc->byte] >> tchsrc->bit) & 1;
     uint16_t X, Y;
 
     if (touch)
     {
         X = tpadside == LeftTpad ?
-            (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024
-            : (float) (*(int16_t *)&sdcrep[scalX->bytofst] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
-        Y = 800 - (float) (*(int16_t *)&sdcrep[scalY->bytofst] - INT16_MIN) / UINT16_MAX * 800;
+            (float) (*(int16_t *)&sdcrep[scalX->byte] - INT16_MIN) / UINT16_MAX * 1024
+            : (float) (*(int16_t *)&sdcrep[scalX->byte] - INT16_MIN) / UINT16_MAX * 1024 + 1024; // offset for right tpad
+        Y = 800 - (float) (*(int16_t *)&sdcrep[scalY->byte] - INT16_MIN) / UINT16_MAX * 800;
 
-        ds4rep[ds4tpadf2touch.bytofst] = (count & 0x7F);
-        ds4rep[ds4tpadf2touch.bytofst + 1] |= X;
-        ds4rep[ds4tpadf2touch.bytofst + 2] |= X >> 8;
-        ds4rep[ds4tpadf2touch.bytofst + 2] |= Y << 4 ;
-        ds4rep[ds4tpadf2touch.bytofst + 3] |= Y >> 4;
-        memcpy( cord, &ds4rep[ds4tpadf2touch.bytofst + 1], 3);
+        ds4rep[ds4tpadf2touch.byte] = (count & 0x7F);
+        ds4rep[ds4tpadf2touch.byte + 1] |= X;
+        ds4rep[ds4tpadf2touch.byte + 2] |= X >> 8;
+        ds4rep[ds4tpadf2touch.byte + 2] |= Y << 4 ;
+        ds4rep[ds4tpadf2touch.byte + 3] |= Y >> 4;
+        memcpy( cord, &ds4rep[ds4tpadf2touch.byte + 1], 3);
     } else
     {
-        ds4rep[ds4tpadf2touch.bytofst] = 0x80;
-        ds4rep[ds4tpadf2touch.bytofst] |= (prevtch ? ++count : count) & 0x7F;
-        memcpy( &ds4rep[ds4tpadf2touch.bytofst + 1],  cord, 3);
+        ds4rep[ds4tpadf2touch.byte] = 0x80;
+        ds4rep[ds4tpadf2touch.byte] |= (prevtch ? ++count : count) & 0x7F;
+        memcpy( &ds4rep[ds4tpadf2touch.byte + 1],  cord, 3);
     }
     prevtch = touch;
 }
@@ -276,9 +274,9 @@ inline static void set_tpad(
     static uint8_t prevtouch;
     static enum TouchMode mode;
     uint8_t curtouch 
-        = (sdcrep[sdcrtpadtouch.bytofst] >> sdcrtpadtouch.bitofst) & 1;
+        = (sdcrep[sdcrtpadtouch.byte] >> sdcrtpadtouch.bit) & 1;
     curtouch 
-        |= (sdcrep[sdcltpadtouch.bytofst] >> (sdcltpadtouch.bitofst - 1)) & 2;
+        |= (sdcrep[sdcltpadtouch.byte] >> (sdcltpadtouch.bit - 1)) & 2;
 
     if( prevtouch == 0 && curtouch == 1)
         mode = RightFirst;
@@ -321,7 +319,7 @@ inline static void set_tpad(
         );
     }
 
-    ds4rep[ds4tpadtime.bytofst] 
+    ds4rep[ds4tpadtime.byte] 
         = tpadtime + (curtouch ? timeinc : 0);
 }
 
@@ -335,16 +333,16 @@ void trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
     uint16_t timeinc = ( curtp.tv_nsec - prevtp.tv_nsec ) * 0.0001504; // (1/1.25ms * 188) in nanoseconds
 
     // leave last two bits for PS and tpad click
-    uint8_t counter = ((uint8_t) ds4rep[ds4counter.bytofst]  + (1 << 2))  & 0xFC;
-    uint16_t timestmp = *(uint16_t*)&ds4rep[ds4tymstmp.bytofst] + timeinc;
-    uint8_t tpadtime = ds4rep[ds4tpadtime.bytofst];
+    uint8_t counter = ((uint8_t) ds4rep[ds4counter.byte]  + (1 << 2))  & 0xFC;
+    uint16_t timestmp = *(uint16_t*)&ds4rep[ds4tymstmp.byte] + timeinc;
+    uint8_t tpadtime = ds4rep[ds4tpadtime.byte];
 
     memset(ds4rep, 0, REP_SIZE);
 
     ds4rep[0] = 0x01; // report id
-    ds4rep[ds4batlvl.bytofst] = UINT8_MAX; // battery
-    ds4rep[ds4counter.bytofst] = counter;
-    *(uint16_t *) &ds4rep[ds4tymstmp.bytofst]  = timestmp;
+    ds4rep[ds4batlvl.byte] = UINT8_MAX; // battery
+    ds4rep[ds4counter.byte] = counter;
+    *(uint16_t *) &ds4rep[ds4tymstmp.byte]  = timestmp;
     ds4rep[30] = 0x1B; // no headphones/ nothing attached
     ds4rep[33] = 0x01; // 2 finger tpad touch mode
      
@@ -412,7 +410,7 @@ static void update_accel_map( enum Ds4AccelEnum e, uint8_t row )
 {
      switch (e) {
         case Ds4AccelDefault:
-            sensor_map[row][1] = (scalitm *)  default_sensor_map[row][1];
+            sensor_map[row][1] = (scalar_item *)  default_sensor_map[row][1];
             break;
         case Ds4AccelNone:
             sensor_map[row][1] = NULL;
@@ -420,7 +418,7 @@ static void update_accel_map( enum Ds4AccelEnum e, uint8_t row )
         case Ds4AccelX:
         case Ds4AccelY:
         case Ds4AccelZ:
-            sensor_map[row][1] = (scalitm *) default_sensor_map[e][1];
+            sensor_map[row][1] = (scalar_item *) default_sensor_map[e][1];
             break;
         default:
             fputs("Invalid accel mapping, check config.json\n", stderr);
@@ -559,9 +557,9 @@ static void clear_notifier()
 
 static void apply_default_map()
 {
-    memcpy(bool_map, default_bool_map, sizeof(boolitm*)*BOOL_CNT*2);
-    memcpy(scalar_map, default_scalar_map, sizeof(scalitm*)*SCALAR_CNT*2);
-    memcpy(sensor_map, default_sensor_map, sizeof(scalitm*)*SENSOR_CNT*2);
+    memcpy(bool_map, default_bool_map, sizeof(bool_item*)*BOOL_CNT*2);
+    memcpy(scalar_map, default_scalar_map, sizeof(scalar_item*)*SCALAR_CNT*2);
+    memcpy(sensor_map, default_sensor_map, sizeof(scalar_item*)*SENSOR_CNT*2);
     memcpy(scalar_inv_map, default_scalar_inv_map, SCALAR_CNT);
     memcpy(sensor_inv_map, default_sensor_inv_map, SENSOR_CNT);
     memcpy(sensor_ofst_map, default_sensor_ofst_map, SENSOR_CNT*sizeof(int16_t));

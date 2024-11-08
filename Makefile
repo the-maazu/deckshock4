@@ -1,7 +1,7 @@
 .SECONDEXPANSION:
 include .env
 
-version = 0.1.0
+version = 0.1.1
 objdir = build
 objects := $(patsubst src%.c,$(objdir)%.o, $(wildcard src/*.c))
 dbgobjdir = build/debug

@@ -38,17 +38,19 @@ You can mix up the mapping to <code>accelX</code>,<code>accelY</code> and <code>
 In the future this will be controlled with a frontend decky-plugin.
 
 ### Controller Settings & Steam Client Considerations
-Input is duplicated while **deckshock4** is running;
+Input may be duplicated while **deckshock4** is running;
 
-- In game mode, it is recommended to only interact with device using touch screen while the client is in focus.
-- In desktop mode, disable steam input for the emulated 'PS4 Controller' in Desktop Layout settings.
-- For games and apps with native DS4 support like PS Plus®, God of War© etc;
-   1. Remove all Steam controller mappings for inbuilt controller leaving only Gyro set 'As Joystick'.
-   2. Optional: Enable Trackpads 'As Joystick' for haptic feedback. 
-   3. Disable steam input for the virtual 'PS4 Controller'.
-   4. Download and extract [Proto-X.X-X-ds4-X](https://github.com/the-maazu/Proton/releases) to <code>~/.steam/root/compatibilitytools.d/</code>. These are patched versions of proton to help detect virtual DS4 as a real controller. Some non-Sony games with DS4 support may not need this.
+- From v0.1.1 deckshock4 will try to grab(inhibit) the steam controller virtual input, so no need to remove in-built controller mappings in the per game controller settings.
+- However the steam client itself recieves the raw input so touch interactions with steam client UI is recommended while deckshock4 is running.
+- In desktop mode, disable steam input for the emulated PS4 Controller in Desktop Layout settings.
+- For games and apps with native DS4 support like RPCS3, PS Plus®, God of War© etc;
+   1. Disable steam input for the virtual PS4 Controller.
+   2. For the inbuilt controller set Gyro 'As Joystick'. Without gyro mapped to something Steam Controller does not send out sensor data.
+   3. Optional: For inbuilt controller set Trackpads 'As Joystick' to enable haptic feedback.
+   4. Download and extract [Proto-X.X-X-ds4-X](https://github.com/the-maazu/Proton/releases) to <code>~/.steam/root/compatibilitytools.d/</code>. These are patched versions of proton to help detect virtual DS4 as a real controller. Some non-Sony or Linux games/apps with DS4 support may not need this.
    5. Restart Steam client
    6. Force compatibility in game properties and select **Proton-X.X-X-ds4-X**.
+
    
 **Note For PS Plus:**
 - Desktop mode is recommended as the app sometimes minimizes into system tray, which is not accessible in game mode. Seems to happen at start and if the network is bad.
