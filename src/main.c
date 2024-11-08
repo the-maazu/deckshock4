@@ -17,6 +17,7 @@ void quit(int status)
     fputs("\nQuitting\n", stderr);
     ds4_destroy();
     sdc_close();
+    sdc_vgp_release();
     trans_deinit();
     exit(status);
 }
@@ -43,6 +44,7 @@ int main(int argc, char **argv)
     }
     fputs("Created DS4 successfully\n", stderr);
 
+    sdc_vgp_grab();
     trans_init();
 
     // should help smoothen sensors
@@ -63,12 +65,14 @@ int main(int argc, char **argv)
         {   
             fputs("Disabling virtual controller\n", stderr);
             ds4_destroy();
+            sdc_vgp_grab();
             while(trans_is_disabled())
             {
                 sleep(1); // throttle probe
                 trans_config_probe();
             }
             ds4_create();
+            sdc_vgp_release();
         }
             
         
@@ -77,7 +81,6 @@ int main(int argc, char **argv)
         // steam button routine
         if(curtp.tv_sec - prevtp.tv_sec > 10)
             quit(EXIT_SUCCESS); // quit if steam button held for 10 secs
-
         clock_gettime(CLOCK_REALTIME, &curtp);            
         if(!sdc_steam_down(sdcrep))
         { // reset time delta

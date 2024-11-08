@@ -569,7 +569,6 @@ static void apply_default_map()
 
 void trans_init()
 {  
-    struct stat st = {0};
     char * username = NULL;
     char * configdir = NULL;
     int configfd;
