@@ -205,14 +205,23 @@ inline static int shake_button_down(const char *sdcrep)
 inline static void shake_sensors(char *ds4rep)
 {
     scalar_item* ds4itm;
-    float min;
-    float max;
+    size_t size;
+    uint8_t s;
+    uint8_t bytofst;
+    int16_t max;
+    int16_t min;
+    int16_t val;
+    
     for (int i = 0; i < SENSOR_CNT; i++){
-        ds4itm = sensor_map[i][DS4_COL];
-        min =  ds4itm->min;
+        ds4itm = (scalar_item *) default_sensor_map[i][DS4_COL];
+        size = ds4itm->size;
+        s = ds4itm->s;
+        bytofst = ds4itm->byte;
         max = ds4itm->max;
+        min = ds4itm->min;
         // pick random value between min and max
-        ds4rep[ds4itm->byte] = min + (max - min) * ((double) rand()/RAND_MAX);
+        val = min + (max - min) * ((double) rand()/RAND_MAX);
+        *(uint16_t *) &ds4rep[bytofst] = (int16_t) val;
     }
         
 }
@@ -230,8 +239,8 @@ inline static void set_scalar(
     size_t nbyts = sdcitm->size;
     uint8_t s = sdcitm->s;
     uint8_t bytofst = sdcitm->byte;
-    int32_t max = sdcitm->max;
-    int32_t min = sdcitm->min;
+    int16_t max = sdcitm->max;
+    int16_t min = sdcitm->min;
 
     float norm;
     if( nbyts == 1)
@@ -242,10 +251,6 @@ inline static void set_scalar(
         norm = s ? 
         (float)(*(int16_t*) &sdcrep[bytofst])
         : (float)(*(uint16_t*) &sdcrep[bytofst]);
-    else if ( nbyts == 4)
-        norm = s ? 
-        (float)(*(int32_t*) &sdcrep[bytofst])
-        : (float)(*(uint32_t*) &sdcrep[bytofst]);
     norm += offset;
     norm = (norm - min)/(max - min); // normalise from 0 to 1;
 
@@ -259,7 +264,6 @@ inline static void set_scalar(
     norm = invert ? max - norm : min + norm;
     if( nbyts == 1) *(uint8_t *) &ds4rep[bytofst] = s ? (int8_t) norm : (uint8_t) norm;
     else if ( nbyts == 2) *(uint16_t *) &ds4rep[bytofst] = s ? (int16_t) norm : (uint16_t) norm;
-    else if ( nbyts == 4) *(uint32_t *) &ds4rep[bytofst] = s ? (int32_t) norm : (uint32_t) norm;
 }
 
 inline static void set_scalars(char *ds4rep, const char *sdcrep)
