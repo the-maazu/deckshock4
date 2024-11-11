@@ -48,13 +48,6 @@ int sdc_open()
         ioctl(sdcfd, HIDIOCGRDESCSIZE, &(desc.size));
         ioctl(sdcfd, HIDIOCGRDESC, &desc);
 
-        fprintf(stderr, "path: %s\n", path);
-        fprintf(stderr, "Bustype(3 for USB):%i VID:%x PID:%x First3bytes:0x",
-        devinfo.bustype, devinfo.vendor, devinfo.product);
-        for (int i = 0; i < 3; i++)
-			fprintf(stderr, "%02x", desc.value[i]);
-        fputs("\n", stderr);
-
         if (
             devinfo.bustype == BUS_USB 
             && devinfo.vendor == 0x28de 
@@ -62,11 +55,13 @@ int sdc_open()
             && !memcmp(desc_tip, desc.value, sizeof(desc_tip))
         ) {
             sd_device_enumerator_unref(sdcenum);
+            fputs("Opened SDC successfully\n", stderr);
             return EXIT_SUCCESS;
         }
     }
 
     sd_device_enumerator_unref(sdcenum);
+    fputs("Failed to open SDC\n", stderr);
     return EXIT_FAILURE;
 }
 

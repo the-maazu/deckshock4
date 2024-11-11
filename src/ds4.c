@@ -316,14 +316,12 @@ int ds4_create()
 	struct uhid_event ev;
 	int ret;
 
-	fprintf(stderr, "Open uhid-cdev %s\n", path);
 	uhidfd = open(path, O_RDWR | __O_CLOEXEC);
 	if (uhidfd < 0) {
 		fprintf(stderr, "Cannot open uhid-cdev %s: %m\n", path);
 		return EXIT_FAILURE;
 	}
 
-	fprintf(stderr, "Create DS4 device\n");
 	memset(&ev, 0, sizeof(ev));
 	ev.type = UHID_CREATE2;
 	strcpy((char *) ev.u.create2.name, "Sony Computer Entertainment Wireless Controller");
@@ -340,7 +338,12 @@ int ds4_create()
     uhidpfd.fd = uhidfd;
     uhidpfd.events = POLLIN;
 
-	return uhid_write(&ev);
+	ret = uhid_write(&ev);
+    if(ret == EXIT_FAILURE)
+        fputs("Failed to create DS4\n", stderr);
+    else if(ret == EXIT_SUCCESS) 
+        fputs("Created DS4 successfully\n", stderr);
+    return ret;
 }
 
 void ds4_destroy()
@@ -369,7 +372,7 @@ static void handle_get_report(const struct uhid_event *ev)
     nev.u.get_report_reply.id = ev->u.get_report.id;
     nev.u.get_report_reply.err = 0;
 
-    fprintf(stderr, "Get report: %02x\n", ev->u.get_report.rnum);
+    // fprintf(stderr, "Get report: %02x\n", ev->u.get_report.rnum);
     switch(ev->u.get_report.rnum)
     {
         case REPID_MAC:
@@ -403,7 +406,7 @@ static void handle_set_report(const struct uhid_event *ev)
     nev.u.get_report_reply.id = ev->u.get_report.id;
     nev.u.get_report_reply.err = 0;
 
-    fprintf(stderr, "Set report: %02x\n", ev->u.get_report.rnum);
+    // fprintf(stderr, "Set report: %02x\n", ev->u.get_report.rnum);
     uhid_write(&nev);
 }
 
@@ -431,7 +434,7 @@ int ds4_recieve_req()
 	}
 	switch (ev.type) {
         case UHID_GET_REPORT:
-            fprintf(stderr, "UHID_GET_REPORT from uhid-dev\n");
+            // fprintf(stderr, "UHID_GET_REPORT from uhid-dev\n");
             handle_get_report(&ev);
             break;
 	    case UHID_START:
@@ -453,7 +456,7 @@ int ds4_recieve_req()
 	    	// fprintf(stderr, "UHID_OUTPUT_EV from uhid-dev\n");
 	    	break;
         case UHID_SET_REPORT:
-            fprintf(stderr, "UHID_SET_REPORT from uhid-dev\n");
+            // fprintf(stderr, "UHID_SET_REPORT from uhid-dev\n");
             handle_set_report(&ev);
 	    	break;
 	    default:

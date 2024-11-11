@@ -5,8 +5,8 @@
 #include <limits.h>
 
 typedef struct{
-    uint8_t byte; // byte offset
-    uint8_t bit; // bit offset
+    uint8_t byte; // zero based byte offset 
+    uint8_t bit; // zero based bit offset
 } bool_item;
 
 typedef struct {
@@ -16,6 +16,20 @@ typedef struct {
     int32_t min;
     int32_t max;
 } scalar_item;
+
+// bool or virtual item
+enum ItemType {BItem, VItem};
+enum VirtualItem {VShake};
+typedef struct {
+    enum ItemType type;
+    union {
+        bool_item* boolitm;
+        enum VirtualItem virtitm;
+    } value;
+} bv_item;
+
+#define BOOL_ITEM(val) (bv_item) {.type=BItem, .value.boolitm=val}
+#define VIRT_ITEM(val) (bv_item) {.type=VItem, .value.virtitm=val}
 
 // Start of SDC items
 //  dpad
@@ -120,6 +134,23 @@ static const scalar_item sdcR2 = {
     .s = 0,
     .min = 0,
     .max = 0x7FFF,
+};
+// back buttons
+static const bool_item sdcL4 = {
+    .byte = 13,
+    .bit = 1,
+};
+static const bool_item sdcL5 = {
+    .byte = 9,
+    .bit = 7,
+};
+static const bool_item sdcR4 = {
+    .byte = 13,
+    .bit = 2,
+};
+static const bool_item sdcR5 = {
+    .byte = 10,
+    .bit = 0,
 };
 // share, option and STEAM button
 static const bool_item sdcmenu = {

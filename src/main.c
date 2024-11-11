@@ -31,19 +31,11 @@ int main(int argc, char **argv)
     signal(SIGQUIT, quit);
 
     fputs("Starting\n", stderr);
-    if (sdc_open() == EXIT_FAILURE)
-    {
-        fputs("Failed to open SDC\n", stderr);
-        quit(EXIT_FAILURE);
-    }
-    fputs("Opened SDC successfully\n", stderr);
-    if (ds4_create() == EXIT_FAILURE)
-    {
-        fputs("Failed to create DS4\n", stderr);
-        quit(EXIT_FAILURE);
-    }
-    fputs("Created DS4 successfully\n", stderr);
 
+    if (
+        sdc_open() == EXIT_FAILURE
+        || ds4_create() == EXIT_FAILURE
+    ) quit(EXIT_FAILURE);
     sdc_vgp_grab();
     trans_init();
 

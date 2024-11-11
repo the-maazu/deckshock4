@@ -15,9 +15,29 @@
 #include "headers/trans.h"
 #include "headers/items.h"
 
+#define SDC_COL 0
+#define DS4_COL 1
 #define BOOL_CNT 15
 #define SCALAR_CNT 6
 #define SENSOR_CNT 6
+#define BACKBTN_CNT 4
+
+// Enum non-negative ints map to default_bool_map row indices
+enum BackButtonMap {
+    BackButtonDisable=-3,
+    BackButtonDefault,
+    BackButtonShake,
+    // Back buttoon can map to bools
+    X=0,O,Sq,Tri,L1,R1,
+    L2Bool, R2Bool,
+    Share,Optns,PS,
+    Tpad1,Tpad2,
+    L3,R3
+};
+enum BackButton {R4=0,R5,L4,L5};
+static const bool_item* back_buttons[BACKBTN_CNT] = {&sdcR4, &sdcR5,&sdcL4,&sdcL5 };
+static const bv_item default_back_button_map[BACKBTN_CNT] 
+    = {VIRT_ITEM(VShake), BOOL_ITEM(NULL),BOOL_ITEM(NULL),BOOL_ITEM(NULL)};
 
 static const bool_item* default_bool_map[BOOL_CNT][2] = {
     // face buttons
@@ -41,6 +61,7 @@ static const bool_item* default_bool_map[BOOL_CNT][2] = {
     {&sdcL3, &ds4L3},
     {&sdcR3, &ds4R3},
 };
+
 static const scalar_item* default_scalar_map[SCALAR_CNT][2] = {
      // sticks
     {&sdclstickX, &ds4lstickX},
@@ -50,6 +71,13 @@ static const scalar_item* default_scalar_map[SCALAR_CNT][2] = {
     // triggers
     {&sdcL2, &ds4L2},
     {&sdcR2, &ds4R2},
+};
+
+// Enum non-negative ints map to default_sensor_map row indices
+enum Sensor{ 
+    SensorDisable=-2, 
+    SensorDefault,
+    AccelX, AccelY, AccelZ 
 };
 static const scalar_item* default_sensor_map[SENSOR_CNT][2] = {
      //  accelerometer
@@ -74,20 +102,128 @@ static uint8_t scalar_inv_map[SCALAR_CNT] = {0};
 static scalar_item* sensor_map[SENSOR_CNT][2] = {NULL};
 static uint8_t sensor_inv_map[SENSOR_CNT] = {0};
 static int16_t sensor_ofst_map[SENSOR_CNT] = {0};
+static bv_item back_button_map[BACKBTN_CNT] = {0};
+
+
+static void apply_default_map()
+{
+    memcpy(bool_map, default_bool_map, sizeof(bool_item*)*BOOL_CNT*2);
+    memcpy(scalar_map, default_scalar_map, sizeof(scalar_item*)*SCALAR_CNT*2);
+    memcpy(sensor_map, default_sensor_map, sizeof(scalar_item*)*SENSOR_CNT*2);
+    memcpy(scalar_inv_map, default_scalar_inv_map, SCALAR_CNT);
+    memcpy(sensor_inv_map, default_sensor_inv_map, SENSOR_CNT);
+    memcpy(sensor_ofst_map, default_sensor_ofst_map, SENSOR_CNT*sizeof(int16_t));
+    memcpy(back_button_map, default_back_button_map, sizeof(bv_item)*BACKBTN_CNT);
+}
+
+static void update_accel_map(enum Sensor idx, enum Sensor mapidx)
+{
+     switch (mapidx) {
+        case SensorDefault:
+            sensor_map[idx][DS4_COL] 
+                = (scalar_item *)  default_sensor_map[idx][DS4_COL];
+            break;
+        case SensorDisable:
+            sensor_map[idx][DS4_COL] = NULL;
+            break;
+        case AccelX...AccelZ:
+            sensor_map[idx][DS4_COL] 
+                = (scalar_item *) default_sensor_map[mapidx][DS4_COL];
+            break;
+        default:
+            fputs("Invalid accel mapping, check config.json\n", stderr);
+    }
+}
+
+static void update_back_button_map(enum BackButton idx, enum BackButtonMap mapidx)
+{
+    switch (mapidx) {
+        case BackButtonDisable:
+            back_button_map[idx] = BOOL_ITEM(NULL);
+            break;
+        case BackButtonShake:
+            back_button_map[idx] = VIRT_ITEM(VShake);
+            break;
+        case BackButtonDefault:
+            back_button_map[idx] = default_back_button_map[idx];
+            break;
+        case X...R3:
+            back_button_map[idx] = BOOL_ITEM((bool_item *) default_bool_map[mapidx][DS4_COL]);
+            break;
+        default:
+            fputs("Invalid back button mapping, check config.json\n", stderr);
+    }
+}
+
 
 inline static void set_bools(char *ds4rep, const char *sdcrep)
 {
-    const bool_item *ds4;
-    const bool_item *sdc;
+    const bool_item *ds4itm;
+    const bool_item *sdcitm;
     uint8_t sdcval;
     for (int i = 0; i < BOOL_CNT; i++)
     {
-        ds4 = bool_map[i][1];
-        sdc = bool_map[i][0];
-        if(ds4 == NULL || sdc == NULL) return;
-        sdcval = sdcrep[sdc->byte] >> sdc->bit & 1;
-        ds4rep[ds4->byte] |= sdcval << ds4->bit;
+        ds4itm = bool_map[i][DS4_COL];
+        sdcitm = bool_map[i][SDC_COL];
+        if(ds4itm == NULL || sdcitm == NULL) return;
+        sdcval = sdcrep[sdcitm->byte] >> sdcitm->bit & 1;
+        ds4rep[ds4itm->byte] |= sdcval << ds4itm->bit;
     }
+
+    // back buttons
+    for (int i = R4; i <= L5; i++)
+    {
+        sdcitm = (bool_item *) back_buttons[i];
+        if(
+            back_button_map[i].type == BItem 
+            && back_button_map[i].value.boolitm != NULL
+        ) {
+            ds4itm = back_button_map[i].value.boolitm;
+            sdcval = sdcrep[sdcitm->byte] >> sdcitm->bit & 1;
+            ds4rep[ds4itm->byte] |= sdcval << ds4itm->bit;
+        }
+    }
+}
+
+inline static int shake_button_down(const char *sdcrep)
+{
+    
+    bool_item* sdcitm;
+    
+    for(int i = R4; i <= L5; i++){
+        sdcitm = (bool_item *) back_buttons[i];
+        if(
+            back_button_map[i].type == VItem 
+            && back_button_map[i].value.virtitm == VShake
+            && sdcrep[sdcitm->byte] >> sdcitm->bit & 1
+        ) return 1;
+    }
+    
+    return 0;
+}
+
+inline static void shake_sensors(char *ds4rep)
+{
+    scalar_item* ds4itm;
+    size_t size;
+    uint8_t s;
+    uint8_t bytofst;
+    int16_t max;
+    int16_t min;
+    int16_t val;
+    
+    for (int i = 0; i < SENSOR_CNT; i++){
+        ds4itm = (scalar_item *) default_sensor_map[i][DS4_COL];
+        size = ds4itm->size;
+        s = ds4itm->s;
+        bytofst = ds4itm->byte;
+        max = ds4itm->max;
+        min = ds4itm->min;
+        // pick random value between min and max
+        val = min + (max - min) * ((double) rand()/RAND_MAX);
+        *(uint16_t *) &ds4rep[bytofst] = (int16_t) val;
+    }
+        
 }
 
 inline static void set_scalar(
@@ -103,8 +239,8 @@ inline static void set_scalar(
     size_t nbyts = sdcitm->size;
     uint8_t s = sdcitm->s;
     uint8_t bytofst = sdcitm->byte;
-    int32_t max = sdcitm->max;
-    int32_t min = sdcitm->min;
+    int16_t max = sdcitm->max;
+    int16_t min = sdcitm->min;
 
     float norm;
     if( nbyts == 1)
@@ -115,10 +251,6 @@ inline static void set_scalar(
         norm = s ? 
         (float)(*(int16_t*) &sdcrep[bytofst])
         : (float)(*(uint16_t*) &sdcrep[bytofst]);
-    else if ( nbyts == 4)
-        norm = s ? 
-        (float)(*(int32_t*) &sdcrep[bytofst])
-        : (float)(*(uint32_t*) &sdcrep[bytofst]);
     norm += offset;
     norm = (norm - min)/(max - min); // normalise from 0 to 1;
 
@@ -132,7 +264,6 @@ inline static void set_scalar(
     norm = invert ? max - norm : min + norm;
     if( nbyts == 1) *(uint8_t *) &ds4rep[bytofst] = s ? (int8_t) norm : (uint8_t) norm;
     else if ( nbyts == 2) *(uint16_t *) &ds4rep[bytofst] = s ? (int16_t) norm : (uint16_t) norm;
-    else if ( nbyts == 4) *(uint32_t *) &ds4rep[bytofst] = s ? (int32_t) norm : (uint32_t) norm;
 }
 
 inline static void set_scalars(char *ds4rep, const char *sdcrep)
@@ -140,8 +271,8 @@ inline static void set_scalars(char *ds4rep, const char *sdcrep)
     for (int i = 0; i < SCALAR_CNT; i++)
         set_scalar(
             ds4rep, sdcrep, 
-            scalar_map[i][1], 
-            scalar_map[i][0], 
+            scalar_map[i][DS4_COL], 
+            scalar_map[i][SDC_COL], 
             scalar_inv_map[i], 
             0
         );
@@ -152,8 +283,8 @@ inline static void set_sensors(char *ds4rep, const char *sdcrep)
     for (int i = 0; i < SENSOR_CNT; i++)
         set_scalar(
             ds4rep, sdcrep, 
-            sensor_map[i][1],
-            sensor_map[i][0],
+            sensor_map[i][DS4_COL],
+            sensor_map[i][SDC_COL],
             sensor_inv_map[i],
             sensor_ofst_map[i]
         );
@@ -349,17 +480,32 @@ void trans_rep_sdc_to_ds4(char *ds4rep, const char *sdcrep)
     set_dpad(ds4rep, sdcrep);
     set_bools(ds4rep, sdcrep);
     set_scalars(ds4rep, sdcrep);
-    set_sensors(ds4rep, sdcrep);
+    if(shake_button_down(sdcrep)) shake_sensors(ds4rep);
+    else set_sensors(ds4rep, sdcrep);
     set_tpad(ds4rep, sdcrep, tpadtime, timeinc);
 
     prevtp = curtp;
 }
 
 
-
 // CONFIG CODE BELOW
 #define CONFIG_FILE "config.json"
 #define CONFIG_HOMEREL_PATH "/.local/share/deckshock4/"
+struct Config {
+    enum Sensor accelX;
+    enum Sensor accelY;
+    enum Sensor accelZ;
+    uint8_t invaccelX;
+    uint8_t invaccelY;
+    uint8_t invaccelZ;
+    int16_t accelXofst;
+    int16_t accelYofst;
+    int16_t accelZofst;
+    enum BackButtonMap L4;
+    enum BackButtonMap L5;
+    enum BackButtonMap R4;
+    enum BackButtonMap R5;
+};
 
 static char * configpath = NULL;
 static int inotifd;
@@ -385,59 +531,27 @@ static int mkdir_p(const char *dir)
     return EXIT_SUCCESS;
 }
 
-// Numbering maps to default_sensor_map locations
-enum Ds4AccelEnum{ 
-    Ds4AccelNone=-2, 
-    Ds4AccelDefault=-1, 
-    Ds4AccelX, 
-    Ds4AccelY,
-    Ds4AccelZ, 
-};
-
-struct Config {
-    enum Ds4AccelEnum accelX;
-    enum Ds4AccelEnum accelY;
-    enum Ds4AccelEnum accelZ;
-    uint8_t invaccelX;
-    uint8_t invaccelY;
-    uint8_t invaccelZ;
-    int16_t accelXofst;
-    int16_t accelYofst;
-    int16_t accelZofst;
-};
-
-static void update_accel_map( enum Ds4AccelEnum e, uint8_t row )
-{
-     switch (e) {
-        case Ds4AccelDefault:
-            sensor_map[row][1] = (scalar_item *)  default_sensor_map[row][1];
-            break;
-        case Ds4AccelNone:
-            sensor_map[row][1] = NULL;
-            break;
-        case Ds4AccelX:
-        case Ds4AccelY:
-        case Ds4AccelZ:
-            sensor_map[row][1] = (scalar_item *) default_sensor_map[e][1];
-            break;
-        default:
-            fputs("Invalid accel mapping, check config.json\n", stderr);
-    }
-}
-
 static void update_maps(struct Config * config)
 {
     if(config == NULL) return;
+    apply_default_map();
 
-    update_accel_map(config->accelX, 0);
-    update_accel_map(config->accelY, 1);
-    update_accel_map(config->accelZ, 2);
-    sensor_inv_map[0] = config->invaccelX;
-    sensor_inv_map[1] = config->invaccelY;
-    sensor_inv_map[2] = config->invaccelZ;
-    sensor_ofst_map[0] = config->accelXofst;
-    sensor_ofst_map[1] = config->accelYofst;
-    sensor_ofst_map[2] = config->accelZofst;
+    update_accel_map(AccelX, config->accelX);
+    update_accel_map(AccelY, config->accelY);
+    update_accel_map(AccelZ, config->accelZ);
+
+    sensor_inv_map[AccelX] = config->invaccelX;
+    sensor_inv_map[AccelY] = config->invaccelY;
+    sensor_inv_map[AccelZ] = config->invaccelZ;
+    sensor_ofst_map[AccelX] = config->accelXofst;
+    sensor_ofst_map[AccelY] = config->accelYofst;
+    sensor_ofst_map[AccelZ] = config->accelZofst;
+    
+    update_back_button_map(R4, config->R4);
+    update_back_button_map(R5, config->R5);
+    update_back_button_map(L4, config->L4);
+    update_back_button_map(L5, config->L5);
+    
 }
 
 static void parse_config(
@@ -458,15 +572,19 @@ static void parse_config(
     if (*config == NULL) {
         *config = malloc(sizeof(struct Config));
         **config = (struct Config){
-            .accelX = Ds4AccelDefault,
-            .accelY = Ds4AccelDefault,
-            .accelZ = Ds4AccelDefault,
-            .invaccelX = default_sensor_inv_map[0],
-            .invaccelY = default_sensor_inv_map[1],
-            .invaccelZ = default_sensor_inv_map[2],
-            .accelXofst = default_sensor_ofst_map[0],
-            .accelYofst = default_sensor_ofst_map[1],
-            .accelZofst = default_sensor_ofst_map[2],
+            .accelX = SensorDefault,
+            .accelY = SensorDefault,
+            .accelZ = SensorDefault,
+            .invaccelX = default_sensor_inv_map[AccelX],
+            .invaccelY = default_sensor_inv_map[AccelY],
+            .invaccelZ = default_sensor_inv_map[AccelX],
+            .accelXofst = default_sensor_ofst_map[AccelX],
+            .accelYofst = default_sensor_ofst_map[AccelY],
+            .accelZofst = default_sensor_ofst_map[AccelZ],
+            .L4 = BackButtonDefault,
+            .L5 = BackButtonDefault,
+            .R4 = BackButtonDefault,
+            .R5 = BackButtonDefault,
         };
     }
 
@@ -481,6 +599,10 @@ static void parse_config(
         if (strcmp(key, "accelXofst") == 0) (*config)->accelXofst = atoi(value);
         if (strcmp(key, "accelYofst") == 0) (*config)->accelYofst = atoi(value);
         if (strcmp(key, "accelZofst") == 0) (*config)->accelZofst = atoi(value);
+        if (strcmp(key, "L4") == 0) (*config)->L4 = atoi(value);
+        if (strcmp(key, "L5") == 0) (*config)->L5 = atoi(value);
+        if (strcmp(key, "R4") == 0) (*config)->R4 = atoi(value);
+        if (strcmp(key, "R5") == 0) (*config)->R5 = atoi(value);
     }
 }
 
@@ -553,16 +675,6 @@ static void clear_notifier()
 {
     inotify_rm_watch(inotifd, inotiwatchfd);
     close(inotifd);
-}
-
-static void apply_default_map()
-{
-    memcpy(bool_map, default_bool_map, sizeof(bool_item*)*BOOL_CNT*2);
-    memcpy(scalar_map, default_scalar_map, sizeof(scalar_item*)*SCALAR_CNT*2);
-    memcpy(sensor_map, default_sensor_map, sizeof(scalar_item*)*SENSOR_CNT*2);
-    memcpy(scalar_inv_map, default_scalar_inv_map, SCALAR_CNT);
-    memcpy(sensor_inv_map, default_sensor_inv_map, SENSOR_CNT);
-    memcpy(sensor_ofst_map, default_sensor_ofst_map, SENSOR_CNT*sizeof(int16_t));
 }
 
 void trans_init()
