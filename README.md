@@ -16,7 +16,7 @@ DualShock® 4 emulator for Steam Deck®
 
 ## Configuration (from v0.1.0)
 A config file should be created in the home directory <code>~/.local/share/deckshock4/config.json</code>.
-deckshock4 will fallback to an inbuilt default equivalent to the config below, should config.json be malformed or empty (tested with RPCS3).
+deckshock4 will fallback to an inbuilt default equivalent to the config below, should config.json be malformed or empty.
 
 <pre><code>
 {
@@ -44,7 +44,7 @@ In the future this will be controlled with a frontend decky-plugin.
 **Accelerometer:** 
 - <code>accelX</code>,<code>accelY</code>,<code>accelZ</code> can be remapped with '0','1' and '2' and disabled with '-1'.
 - <code>invaccelX</code>,<code>invaccelY</code>,<code>invaccelZ</code> reverse axis directions and are intepreted as <code>false</code> for '0' and <code>true</code> for non-zero values.
-- <code>accelXOfst</code>,<code>accelYOfst</code>,<code>accelZOfst</code> control base orientation and can be assigned values '-32768' to '32767'. Inbuilt defaults assume a flat controller when SteamDeck is held at a viewing angle.
+- <code>accelXOfst</code>,<code>accelYOfst</code>,<code>accelZOfst</code> control base orientation and can be assigned values '-32768' to '32767'. Inbuilt defaults assume a flat controller when SteamDeck is held at a viewing angle (tested with RPCS3).
 
 **Back-buttons (from v0.1.2):** 
 - <code>R4</code>,<code>R5</code>,<code>L4</code>,<code>L5</code> can be mapped to <code>{BackButtonDisable, BackButtonDefault, BackButtonShake, X, O, Square,Triangle, L1, R1, L2, R2, Share,Options,PS, Tpad1,Tpad2, L3, R3}</code> with values '-3' to '14' respectively.
