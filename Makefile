@@ -37,7 +37,9 @@ push: $(outdir)/deckshock4-debug
 .PHONY: package
 package : deckshock4-v$(version).tar.gz
 deckshock4-v$(version).tar.gz : $(outdir)/deckshock4 scripts/uninstall.sh scripts/install.sh etc
-	tar -cz etc -C$(outdir) deckshock4 -C"../scripts" install.sh uninstall.sh > deckshock4-v$(version).tar.gz
+	mkdir out/deckshock4-v$(version)
+	cp -r out/deckshock4 scripts/{install.sh,uninstall.sh} etc out/deckshock4-v$(version)/
+	tar -cz -C"out" deckshock4-v$(version) > deckshock4-v$(version).tar.gz
 
 .PHONY: clean
 clean:

@@ -2,9 +2,8 @@
 DualShock® 4 emulator for Steam Deck®
 
 ## In(unin)stallation & Execution
-1. Download the latest [release ](https://github.com/the-maazu/deckshock4/releases) **deckshock4-vX.X.X.tar.gz**.
-2. Extract into subfolder
-3. Open terminal in subfolder and execute <code>$ ./install.sh</code>
+1. Download the latest [release ](https://github.com/the-maazu/deckshock4/releases) **deckshock4-vX.X.X.tar.gz** and extract content.
+2. Open terminal in the extracted subfolder and execute <code>$ ./install.sh</code>
 4. You can run **deckshock4**
    - In terminal, <code>$ deckshock4</code>,
    - or add as non-steam game and set target to <code>~/.local/bin/deckshock4</code>.
