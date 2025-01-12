@@ -707,7 +707,7 @@ void trans_init()
     
     mkdir_p(configdir);
     free(configdir);
-    configfd = open(configpath, O_CREAT );
+    configfd = open(configpath, O_RDONLY);
     if(configfd == -1){
         fputs("Failed to open config file... using inbuilt default mapping\n", stderr);
         return;

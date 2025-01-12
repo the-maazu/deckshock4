@@ -57,14 +57,14 @@ int main(int argc, char **argv)
         {   
             fputs("Disabling virtual controller\n", stderr);
             ds4_destroy();
-            sdc_vgp_grab();
+            sdc_vgp_release();
             while(trans_is_disabled())
             {
                 sleep(1); // throttle probe
                 trans_config_probe();
             }
             ds4_create();
-            sdc_vgp_release();
+            sdc_vgp_grab();
         }
             
         
